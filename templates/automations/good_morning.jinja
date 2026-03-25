@@ -1,0 +1,11 @@
+{% set name = state_attr('person.resident', 'friendly_name') | default('', true) %}
+{% set temp = states('sensor.outdoor_temperature') | float(0) | int %}
+Good morning{% if name %}, {{ name }}{% endif %}!
+{% if temp < 5 %}It's {{ temp }}°C outside — dress warmly.
+{% elif temp > 25 %}It's {{ temp }}°C outside — it's going to be a hot one!
+{% else %}It's {{ temp }}°C outside.
+{% endif %}
+{% if is_state('weather.forecast_home', 'sunny') %}Enjoy the sunshine today!
+{% elif is_state('weather.forecast_home', 'rainy') %}Don't forget your umbrella!
+{% elif is_state('weather.forecast_home', 'snowy') %}Snow is expected today!
+{% endif %}
