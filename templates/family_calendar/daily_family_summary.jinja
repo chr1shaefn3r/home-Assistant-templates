@@ -1,0 +1,5 @@
+Folgende Familientermine sind für heute noch geplant:
+{% for event in events %}
+{% if 'T' not in event.start %}{{ event.summary }}, Ganztagestermin
+{% endif %}
+{% endfor %}
