@@ -1,7 +1,23 @@
 {% set rainy = forecast | selectattr('precipitation', 'gt', 0) | list %}
 {% if rainy | length == 0 %}Heute bleibt es trocken
 {% else %}
-{% set start = (rainy[0].datetime | as_datetime).hour %}
-{% set end = (rainy[-1].datetime | as_datetime).hour + 1 %}
-Heute regnet es von {{ start }} bis {{ end }} Uhr
+{% set ns = namespace(groups=[], current=[rainy[0]]) %}
+{% for slot in rainy[1:] %}
+{% set prev_hour = (ns.current[-1].datetime | as_datetime).hour %}
+{% set curr_hour = (slot.datetime | as_datetime).hour %}
+{% if curr_hour == prev_hour + 1 %}
+{% set ns.current = ns.current + [slot] %}
+{% else %}
+{% set ns.groups = ns.groups + [ns.current] %}
+{% set ns.current = [slot] %}
+{% endif %}
+{% endfor %}
+{% set ns.groups = ns.groups + [ns.current] %}
+{% set parts = [] %}
+{% for group in ns.groups %}
+{% set start = (group[0].datetime | as_datetime).hour %}
+{% set end = (group[-1].datetime | as_datetime).hour + 1 %}
+{% set _ = parts.append("von " ~ start ~ " bis " ~ end ~ " Uhr") %}
+{% endfor %}
+Heute regnet es {{ parts | join(" und ") }}
 {% endif %}
