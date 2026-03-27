@@ -3,5 +3,5 @@
 {% else %}
 {% set start = (rainy[0].datetime | as_datetime).hour %}
 {% set end = (rainy[-1].datetime | as_datetime).hour + 1 %}
-Heute regnet es von {{ start }} bis zu {{ end }} Uhr
+Heute regnet es von {{ start }} bis {{ end }} Uhr
 {% endif %}
