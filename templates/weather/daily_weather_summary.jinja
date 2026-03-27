@@ -1,0 +1,19 @@
+{% set conditions = {
+  'clear-night':     'eine klare Nacht',
+  'cloudy':          'bewölkt',
+  'exceptional':     'außergewöhnlich',
+  'fog':             'neblig',
+  'hail':            'Hagel',
+  'lightning':       'Gewitter',
+  'lightning-rainy': 'Gewitter mit Regen',
+  'partlycloudy':    'Teilweise bewölkt',
+  'pouring':         'Starker Regen',
+  'rainy':           'regnerisch',
+  'snowy':           'Schnee',
+  'snowy-rainy':     'Schneeregen',
+  'sunny':           'sonnig',
+  'windy':           'windig',
+  'windy-variant':   'windig'
+} %}
+{% set today = forecast[0] %}
+Das Wetter ist aktuell {{ conditions.get(today.condition, today.condition) }} und es wird höchstens {{ today.temperature }} Grad warm.
