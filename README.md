@@ -42,6 +42,52 @@ data:
 
 ---
 
+### Family Calendar (`templates/family_calendar/`)
+
+| Template | Purpose |
+|---|---|
+| `daily_family_summary.jinja` | Produces a German-language summary of today's family calendar events |
+
+**Input:** the `events` list from a `calendar.get_events` action call.
+
+**Output examples:**
+
+| Scenario | Output |
+|---|---|
+| One full-day event | `Folgende Familientermine sind für heute noch geplant:`<br>`Osterfeier, Ganztagestermin` |
+| One timed appointment | `Folgende Familientermine sind für heute noch geplant:`<br>`Kinderarzt von 10 Uhr 30 bis 11 Uhr` |
+| Multiple events | Each event on its own line, in the order returned by HA |
+
+Time formatting: minutes are shown only when non-zero (`10 Uhr 30`, `11 Uhr`).
+
+**Home Assistant usage:**
+
+Call the `calendar.get_events` action first, then render the template with the response:
+
+```yaml
+action: calendar.get_events
+target:
+  entity_id: calendar.familienkalender
+data:
+  duration:
+    hours: 24
+response_variable: agenda
+
+action: notify.mobile_app
+data:
+  message: >
+    {% set events = agenda['calendar.familienkalender']['events'] %}
+    {% include 'daily_family_summary.jinja' %}
+```
+
+**Required entities:**
+
+| Entity | Purpose |
+|---|---|
+| `calendar.familienkalender` | Source calendar (adjust entity ID to match your setup) |
+
+---
+
 ### Sensors (`templates/sensors/`)
 
 | Template | Purpose |
@@ -102,9 +148,10 @@ pytest -v
 All template tests live under `tests/`. Test files mirror the `templates/` directory structure:
 
 ```
-templates/rain/daily_rain_summary.jinja  →  tests/rain/test_*.py
-templates/sensors/time_of_day.jinja      →  tests/test_time_of_day.py
-templates/automations/good_morning.jinja →  tests/test_good_morning.py
+templates/rain/daily_rain_summary.jinja             →  tests/rain/test_*.py
+templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
+templates/sensors/time_of_day.jinja                 →  tests/test_time_of_day.py
+templates/automations/good_morning.jinja            →  tests/test_good_morning.py
 ```
 
 The shared `tests/conftest.py` provides a `render()` pytest fixture that sets up a Jinja2 environment with all Home Assistant globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …). Pass entity states, attributes, the current time, or arbitrary template variables directly in each test:
