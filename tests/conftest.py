@@ -42,6 +42,8 @@ def make_environment(
     env.globals["as_timestamp"] = (
         lambda dt: dt.timestamp() if hasattr(dt, "timestamp") else float(dt)
     )
+    env.globals["as_datetime"] = datetime.fromisoformat
+    env.filters["as_datetime"] = datetime.fromisoformat
 
     # ── HA filters (override Jinja2 defaults to support default args) ────────
     env.filters["float"] = lambda value, default=0.0: (
