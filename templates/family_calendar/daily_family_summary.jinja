@@ -1,5 +1,9 @@
 Folgende Familientermine sind für heute noch geplant:
 {% for event in events %}
 {% if 'T' not in event.start %}{{ event.summary }}, Ganztagestermin
+{% else %}
+{% set start = event.start | as_datetime %}
+{% set end = event.end | as_datetime %}
+{{ event.summary }} von {{ start.hour }} Uhr{% if start.minute != 0 %} {{ start.minute }}{% endif %} bis {{ end.hour }} Uhr{% if end.minute != 0 %} {{ end.minute }}{% endif %}
 {% endif %}
 {% endfor %}
