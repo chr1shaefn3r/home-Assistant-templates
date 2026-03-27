@@ -1,1 +1,7 @@
-{% if forecast | sum(attribute='precipitation') == 0 %}Heute bleibt es trocken{% endif %}
+{% set rainy = forecast | selectattr('precipitation', 'gt', 0) | list %}
+{% if rainy | length == 0 %}Heute bleibt es trocken
+{% else %}
+{% set start = rainy[0].datetime[11:13] | int %}
+{% set end = rainy[-1].datetime[11:13] | int + 1 %}
+Es regnet heute von {{ start }} bis {{ end }} Uhr
+{% endif %}
