@@ -60,7 +60,7 @@ def make_environment(
 
 @pytest.fixture
 def render():
-    """Render helper: render(template_path, states={}, attributes={}, now=dt)."""
+    """Render helper: render(template_path, states={}, attributes={}, now=dt, variables={})."""
 
     def _render(
         template_path: str,
@@ -68,9 +68,10 @@ def render():
         states: dict[str, str] | None = None,
         attributes: dict[str, dict] | None = None,
         now: datetime | None = None,
+        variables: dict | None = None,
     ) -> str:
         env = make_environment(states=states, attributes=attributes, now=now)
         tmpl = env.get_template(template_path)
-        return tmpl.render().strip()
+        return tmpl.render(**(variables or {})).strip()
 
     return _render
