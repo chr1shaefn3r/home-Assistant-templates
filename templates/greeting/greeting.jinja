@@ -1,2 +1,3 @@
 {% set t = now() %}
-{% if t.hour < 12 %}Guten Morgen, es ist {{ t.hour }}Uhr {{ t.minute }}.{% endif %}
+{% if t.hour < 12 %}Guten Morgen, es ist {{ t.hour }}Uhr {{ t.minute }}.
+{% elif t.hour < 18 %}Guten Nachmittag. es ist {{ t.hour }}Uhr {{ t.minute }}.{% endif %}
