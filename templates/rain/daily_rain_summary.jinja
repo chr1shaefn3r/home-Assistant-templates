@@ -13,6 +13,8 @@
 {% endif %}
 {% endfor %}
 {% set ns.groups = ns.groups + [ns.current] %}
+{% if rainy | length == forecast | length %}Heute regnet es den ganzen Tag
+{% else %}
 {% set parts = [] %}
 {% for group in ns.groups %}
 {% set start = (group[0].datetime | as_datetime).hour %}
@@ -20,4 +22,5 @@
 {% set _ = parts.append("von " ~ start ~ " bis " ~ end ~ " Uhr") %}
 {% endfor %}
 Heute regnet es {{ parts | join(" und ") }}
+{% endif %}
 {% endif %}
