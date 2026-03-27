@@ -27,4 +27,4 @@ FORECAST_ONE_HOUR_RAIN = [
 
 def test_one_hour_rain_message(render):
     result = render(TEMPLATE, variables={"forecast": FORECAST_ONE_HOUR_RAIN})
-    assert "Heute regnet es von 10 bis zu 11 Uhr" in result
+    assert "Heute regnet es von 10 bis 11 Uhr" in result
