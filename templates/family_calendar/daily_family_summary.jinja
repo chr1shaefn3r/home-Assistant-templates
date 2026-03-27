@@ -4,6 +4,9 @@ Folgende Familientermine sind für heute noch geplant:
 {% else %}
 {% set start = event.start | as_datetime %}
 {% set end = event.end | as_datetime %}
-{{ event.summary }} von {{ start.hour }} Uhr{% if start.minute != 0 %} {{ start.minute }}{% endif %} bis {{ end.hour }} Uhr{% if end.minute != 0 %} {{ end.minute }}{% endif %}
+{% set ns = namespace(start_time=start.hour ~ " Uhr", end_time=end.hour ~ " Uhr") %}
+{% if start.minute != 0 %}{% set ns.start_time = ns.start_time ~ " " ~ start.minute %}{% endif %}
+{% if end.minute != 0 %}{% set ns.end_time = ns.end_time ~ " " ~ end.minute %}{% endif %}
+{{ event.summary }} von {{ ns.start_time }} bis {{ ns.end_time }}
 {% endif %}
 {% endfor %}
