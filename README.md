@@ -4,6 +4,86 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
 
 ## Template groups
 
+### Greeting (`templates/greeting/`)
+
+| Template | Purpose |
+|---|---|
+| `greeting.jinja` | Produces a German-language time-of-day greeting with the current time |
+
+**Input:** the current time via HA's `now()` global.
+
+**Output examples:**
+
+| Time range | Output |
+|---|---|
+| before 11:00 | `Guten Morgen, es ist 5Uhr 55.` |
+| 11:00 – 12:59 | `Guten Mittag, es ist 11Uhr 30.` |
+| 13:00 – 17:59 | `Guten Nachmittag. es ist 15Uhr 5.` |
+| 18:00 and later | `Guten Abend, es ist 20Uhr 0.` |
+
+**Home Assistant usage:**
+
+```yaml
+action: notify.mobile_app
+data:
+  message: >
+    {% include 'greeting.jinja' %}
+```
+
+---
+
+### Weather (`templates/weather/`)
+
+| Template | Purpose |
+|---|---|
+| `daily_weather_summary.jinja` | Produces a German-language summary of today's weather condition and high temperature |
+
+**Input:** the `forecast` list from a `weather.get_forecasts` action call (daily resolution). Uses `forecast[0]` (today's entry).
+
+**Output examples:**
+
+| Scenario | Output |
+|---|---|
+| Cloudy, 8.8 °C | `Das Wetter ist aktuell bewölkt und es wird höchstens 8.8 Grad warm.` |
+
+**Condition mapping (HA condition → German):**
+
+| HA condition | German |
+|---|---|
+| `clear-night` | eine klare Nacht |
+| `cloudy` | bewölkt |
+| `exceptional` | außergewöhnlich |
+| `fog` | neblig |
+| `hail` | Hagel |
+| `lightning` | Gewitter |
+| `lightning-rainy` | Gewitter mit Regen |
+| `partlycloudy` | Teilweise bewölkt |
+| `pouring` | Starker Regen |
+| `rainy` | regnerisch |
+| `snowy` | Schnee |
+| `snowy-rainy` | Schneeregen |
+| `sunny` | sonnig |
+| `windy` / `windy-variant` | windig |
+
+**Home Assistant usage:**
+
+```yaml
+action: weather.get_forecasts
+target:
+  entity_id: weather.forecast_home
+data:
+  type: daily
+response_variable: daily_forecast
+
+action: notify.mobile_app
+data:
+  message: >
+    {% set forecast = daily_forecast['weather.forecast_home']['forecast'] %}
+    {% include 'daily_weather_summary.jinja' %}
+```
+
+---
+
 ### Rain (`templates/rain/`)
 
 | Template | Purpose |
@@ -22,8 +102,6 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
 | Rain all day | `Heute regnet es den ganzen Tag` |
 
 **Home Assistant usage:**
-
-Call the `weather.get_forecasts` action first, then render the template with the response stored in a variable:
 
 ```yaml
 action: weather.get_forecasts
@@ -56,13 +134,11 @@ data:
 |---|---|
 | One full-day event | `Folgende Familientermine sind für heute noch geplant:`<br>`Osterfeier, Ganztagestermin` |
 | One timed appointment | `Folgende Familientermine sind für heute noch geplant:`<br>`Kinderarzt von 10 Uhr 30 bis 11 Uhr` |
-| Multiple events | Each event on its own line, in the order returned by HA |
+| Multiple events | Each event on its own line, sorted chronologically |
 
-Time formatting: minutes are shown only when non-zero (`10 Uhr 30`, `11 Uhr`).
+Time formatting: minutes are shown only when non-zero (`10 Uhr 30`, `11 Uhr`). Events are always rendered in chronological order regardless of the order returned by HA.
 
 **Home Assistant usage:**
-
-Call the `calendar.get_events` action first, then render the template with the response:
 
 ```yaml
 action: calendar.get_events
@@ -85,6 +161,56 @@ data:
 | Entity | Purpose |
 |---|---|
 | `calendar.familienkalender` | Source calendar (adjust entity ID to match your setup) |
+
+---
+
+### Integration: Morning Summary (`templates/greeting_day_summary.jinja`)
+
+Composes all four groups into a single morning briefing: greeting → weather → rain → family calendar.
+
+**Output example:**
+
+```
+Guten Morgen, es ist 5Uhr 55.
+Das Wetter ist aktuell bewölkt und es wird höchstens 8.8 Grad warm.
+Heute bleibt es trocken
+Folgende Familientermine sind für heute noch geplant:
+Kinderarzt von 10 Uhr 30 bis 11 Uhr
+```
+
+**Home Assistant usage:**
+
+```yaml
+action: weather.get_forecasts
+target:
+  entity_id: weather.forecast_home
+data:
+  type: daily
+response_variable: daily_forecast_response
+
+action: weather.get_forecasts
+target:
+  entity_id: weather.forecast_home
+data:
+  type: hourly
+response_variable: hourly_forecast_response
+
+action: calendar.get_events
+target:
+  entity_id: calendar.familienkalender
+data:
+  duration:
+    hours: 24
+response_variable: agenda
+
+action: notify.mobile_app
+data:
+  message: >
+    {% set daily_forecast = daily_forecast_response['weather.forecast_home']['forecast'] %}
+    {% set hourly_forecast = hourly_forecast_response['weather.forecast_home']['forecast'] %}
+    {% set events = agenda['calendar.familienkalender']['events'] %}
+    {% include 'greeting_day_summary.jinja' %}
+```
 
 ---
 
@@ -112,10 +238,11 @@ pytest -v
 All template tests live under `tests/`. Test files mirror the `templates/` directory structure:
 
 ```
-templates/rain/daily_rain_summary.jinja              →  tests/rain/test_*.py
-templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
 templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
 templates/weather/daily_weather_summary.jinja        →  tests/weather/test_*.py
+templates/rain/daily_rain_summary.jinja              →  tests/rain/test_*.py
+templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
+templates/greeting_day_summary.jinja                 →  tests/test_greeting_day_summary.py
 ```
 
 The shared `tests/conftest.py` provides a `render()` pytest fixture that sets up a Jinja2 environment with all Home Assistant globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …). Pass entity states, attributes, the current time, or arbitrary template variables directly in each test:
