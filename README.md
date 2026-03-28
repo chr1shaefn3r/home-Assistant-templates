@@ -11,7 +11,7 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Family Calendar](#family-calendar-templatesfamily_calendar)
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
-  - [Precondition: File Editor add-on](#precondition-file-editor-add-on)
+  - [Precondition: File Editor app](#precondition-file-editor-app)
   - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
   - [Copying the templates](#copying-the-templates)
   - [Verifying the deployment](#verifying-the-deployment)
@@ -236,15 +236,15 @@ data:
 
 ## Deploying to Home Assistant
 
-### Precondition: File Editor add-on
+### Precondition: File Editor app
 
-The templates need to be placed inside the Home Assistant `config/custom_templates/` directory. The easiest way to manage files on your HA instance is the **File Editor** add-on.
+The templates need to be placed inside the Home Assistant `config/custom_templates/` directory. The easiest way to manage files on your HA instance is the **File Editor** app.
 
 **Install File Editor:**
 
-1. Open Home Assistant and go to **Settings → Add-ons → Add-on Store**.
+1. Open Home Assistant and go to **Settings → Apps → App Store**.
 2. Search for **File editor** and click **Install**.
-3. After installation, enable **Show in sidebar** on the add-on's info page, then click **Start**.
+3. After installation, enable **Show in sidebar** on the app's info page, then click **Start**.
 4. Open **File editor** from the sidebar to confirm it works.
 
 > File Editor only lets you browse within the `config/` directory. All paths below are relative to that root.
