@@ -88,42 +88,6 @@ data:
 
 ---
 
-### Sensors (`templates/sensors/`)
-
-| Template | Purpose |
-|---|---|
-| `time_of_day.jinja` | Returns the current period of day: `morning`, `afternoon`, `evening`, or `night` |
-
-**Home Assistant usage** (template sensor in `configuration.yaml`):
-
-```yaml
-template:
-  - sensor:
-      - name: "Time of Day"
-        state: "{{ states('sensor.time_of_day') }}"
-        # or inline:
-        state: >
-          {% include 'time_of_day.jinja' %}
-```
-
----
-
-### Automations (`templates/automations/`)
-
-| Template | Purpose |
-|---|---|
-| `good_morning.jinja` | Personalised good-morning message including outdoor temperature and weather condition |
-
-**Required entities:**
-
-| Entity | Purpose |
-|---|---|
-| `person.resident` | `friendly_name` attribute used for personalised greeting |
-| `sensor.outdoor_temperature` | Current outdoor temperature in °C |
-| `weather.forecast_home` | Current weather condition |
-
----
-
 ## Developer guide
 
 ### Prerequisites
@@ -148,10 +112,10 @@ pytest -v
 All template tests live under `tests/`. Test files mirror the `templates/` directory structure:
 
 ```
-templates/rain/daily_rain_summary.jinja             →  tests/rain/test_*.py
+templates/rain/daily_rain_summary.jinja              →  tests/rain/test_*.py
 templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
-templates/sensors/time_of_day.jinja                 →  tests/test_time_of_day.py
-templates/automations/good_morning.jinja            →  tests/test_good_morning.py
+templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
+templates/weather/daily_weather_summary.jinja        →  tests/weather/test_*.py
 ```
 
 The shared `tests/conftest.py` provides a `render()` pytest fixture that sets up a Jinja2 environment with all Home Assistant globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …). Pass entity states, attributes, the current time, or arbitrary template variables directly in each test:
