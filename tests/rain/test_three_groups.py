@@ -1,4 +1,5 @@
 """Rain group — three independent two-hour rain windows scenario."""
+from datetime import datetime
 
 TEMPLATE = "rain/daily_rain_summary.jinja"
 
@@ -27,5 +28,5 @@ FORECAST_THREE_GROUPS = [
 
 
 def test_three_rain_groups_message(render):
-    result = render(TEMPLATE, variables={"forecast": FORECAST_THREE_GROUPS})
+    result = render(TEMPLATE, now=datetime(2026, 3, 27, 5, 0, 0), variables={"forecast": FORECAST_THREE_GROUPS})
     assert "Heute regnet es von 8 bis 10 Uhr und von 12 bis 14 Uhr und von 17 bis 19 Uhr" in result

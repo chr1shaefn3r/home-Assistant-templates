@@ -120,6 +120,7 @@ data:
 | Scenario | Output |
 |---|---|
 | No precipitation at all | `Heute bleibt es trocken` |
+| No precipitation today, rain tomorrow | `Heute bleibt es trocken` |
 | Rain in one window | `Heute regnet es von 10 bis 12 Uhr` |
 | Rain in multiple windows | `Heute regnet es von 10 bis 12 Uhr und von 14 bis 16 Uhr` |
 | Rain all day | `Heute regnet es den ganzen Tag` |

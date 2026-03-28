@@ -1,4 +1,5 @@
 """Rain group — two consecutive hours of rain scenario."""
+from datetime import datetime
 
 TEMPLATE = "rain/daily_rain_summary.jinja"
 
@@ -26,5 +27,5 @@ FORECAST_TWO_HOUR_RAIN = [
 
 
 def test_two_hour_rain_message(render):
-    result = render(TEMPLATE, variables={"forecast": FORECAST_TWO_HOUR_RAIN})
+    result = render(TEMPLATE, now=datetime(2026, 3, 27, 5, 0, 0), variables={"forecast": FORECAST_TWO_HOUR_RAIN})
     assert "Heute regnet es von 10 bis 12 Uhr" in result

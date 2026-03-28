@@ -1,4 +1,5 @@
 """Rain group — all-day rain scenario."""
+from datetime import datetime
 
 TEMPLATE = "rain/daily_rain_summary.jinja"
 
@@ -26,5 +27,5 @@ FORECAST_ALL_DAY_RAIN = [
 
 
 def test_all_day_rain_message(render):
-    result = render(TEMPLATE, variables={"forecast": FORECAST_ALL_DAY_RAIN})
+    result = render(TEMPLATE, now=datetime(2026, 3, 27, 5, 0, 0), variables={"forecast": FORECAST_ALL_DAY_RAIN})
     assert "Heute regnet es den ganzen Tag" in result

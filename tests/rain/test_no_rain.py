@@ -1,5 +1,5 @@
 """Rain group — no-rain scenario."""
-import pytest
+from datetime import datetime
 
 TEMPLATE = "rain/daily_rain_summary.jinja"
 
@@ -27,5 +27,5 @@ FORECAST_NO_RAIN = [
 
 
 def test_no_rain_message(render):
-    result = render(TEMPLATE, variables={"forecast": FORECAST_NO_RAIN})
+    result = render(TEMPLATE, now=datetime(2026, 3, 27, 5, 0, 0), variables={"forecast": FORECAST_NO_RAIN})
     assert "Heute bleibt es trocken" in result
