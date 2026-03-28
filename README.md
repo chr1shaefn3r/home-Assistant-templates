@@ -214,6 +214,69 @@ data:
 
 ---
 
+## Deploying to Home Assistant
+
+### Precondition: File Editor add-on
+
+The templates need to be placed inside the Home Assistant `config/custom_templates/` directory. The easiest way to manage files on your HA instance is the **File Editor** add-on.
+
+**Install File Editor:**
+
+1. Open Home Assistant and go to **Settings → Add-ons → Add-on Store**.
+2. Search for **File editor** and click **Install**.
+3. After installation, enable **Show in sidebar** on the add-on's info page, then click **Start**.
+4. Open **File editor** from the sidebar to confirm it works.
+
+> File Editor only lets you browse within the `config/` directory. All paths below are relative to that root.
+
+---
+
+### Setting up the custom_templates directory
+
+Home Assistant looks for `{% include %}` targets in `config/custom_templates/`. Create the directory if it does not exist yet:
+
+1. Open **File editor**.
+2. Click the folder icon in the top-left to open the directory browser.
+3. Navigate to the root (`/config/`).
+4. Create a new folder called `custom_templates`.
+
+---
+
+### Copying the templates
+
+The repository's `templates/` directory maps directly to `config/custom_templates/`. Copy each file using File Editor:
+
+| Repository path | HA path |
+|---|---|
+| `templates/greeting/greeting.jinja` | `custom_templates/greeting/greeting.jinja` |
+| `templates/weather/daily_weather_summary.jinja` | `custom_templates/weather/daily_weather_summary.jinja` |
+| `templates/rain/daily_rain_summary.jinja` | `custom_templates/rain/daily_rain_summary.jinja` |
+| `templates/family_calendar/daily_family_summary.jinja` | `custom_templates/family_calendar/daily_family_summary.jinja` |
+| `templates/greeting_day_summary.jinja` | `custom_templates/greeting_day_summary.jinja` |
+
+For each file:
+
+1. Open **File editor** and navigate to the target folder (create sub-folders as needed via the folder icon).
+2. Click the **+** icon to create a new file with the correct name.
+3. Paste the contents from this repository and save.
+
+---
+
+### Verifying the deployment
+
+Use the **Template editor** built into Home Assistant to confirm the templates render correctly before wiring them into automations:
+
+1. Go to **Developer Tools → Template**.
+2. Paste the following into the template editor and check the output:
+
+```jinja2
+{% include 'greeting/greeting.jinja' %}
+```
+
+You should see the appropriate greeting for the current time. Repeat for other templates, passing any required variables through `{% set %}` statements.
+
+---
+
 ## Developer guide
 
 ### Prerequisites
