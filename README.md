@@ -18,6 +18,12 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Copying the templates](#copying-the-templates)
   - [Reloading custom templates](#reloading-custom-templates)
   - [Verifying the deployment](#verifying-the-deployment)
+- [Automated deployment](#automated-deployment)
+  - [How it works](#how-it-works)
+  - [Precondition: Terminal & SSH app](#precondition-terminal--ssh-app)
+  - [Local deploy script](#local-deploy-script)
+  - [GitHub Actions auto-deploy](#github-actions-auto-deploy)
+  - [Samba alternative](#samba-alternative)
 - [Developer guide](#developer-guide)
   - [Prerequisites](#prerequisites)
   - [Local setup](#local-setup)
@@ -309,6 +315,98 @@ Use the **Template editor** built into Home Assistant to confirm the templates r
 ```
 
 You should see the appropriate greeting for the current time. Repeat for other templates, passing any required variables through `{% set %}` statements.
+
+---
+
+## Automated deployment
+
+### How it works
+
+`scripts/deploy.sh` automates the full deployment cycle:
+
+1. **Change detection** — compares the current `templates/` tree against `.last-deployed` (a file that records the last deployed git commit hash) and lists only what changed. If nothing changed it exits early; pass `--force` to override.
+2. **Transfer** — `rsync` over SSH pushes only the changed files to `config/custom_templates/` on your HA instance (fast, delta-only).
+3. **Reload** — calls `homeassistant.reload_custom_templates` via the HA REST API so changes take effect immediately, no restart needed.
+4. **Record** — writes the current commit hash to `.last-deployed` (gitignored) for the next run.
+
+`.github/workflows/deploy.yml` runs the same script automatically after every successful test run on `main`.
+
+---
+
+### Precondition: Terminal & SSH app
+
+The deploy script connects to HA over SSH. One-time setup:
+
+1. In HA go to **Settings → Apps → App Store**, search for **Terminal & SSH** and install it.
+2. Enable **Advanced Mode** in your user profile (**Profile → Advanced Mode**) — the app is hidden without it.
+3. Generate an ECDSA key pair on your local machine if you don't have one:
+   ```bash
+   ssh-keygen -t ecdsa -f ~/.ssh/id_ecdsa
+   ```
+4. Open the **Terminal & SSH** app configuration and paste the contents of `~/.ssh/id_ecdsa.pub` into the **Authorized keys** field.
+5. Start the app and confirm you can connect:
+   ```bash
+   ssh -i ~/.ssh/id_ecdsa root@homeassistant.local
+   ```
+
+---
+
+### Local deploy script
+
+1. Copy `.env.example` to `.env` and fill in the values:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   | Variable | Description |
+   |---|---|
+   | `HA_HOST` | Hostname or IP of your HA instance (e.g. `homeassistant.local`) |
+   | `HA_USER` | SSH user — always `root` on HA OS |
+   | `HA_SSH_PORT` | SSH port — default `22` |
+   | `HA_SSH_KEY` | Path to your ECDSA private key — default `~/.ssh/id_ecdsa` |
+   | `HA_TOKEN` | Long-lived access token — create one at **Profile → Security → Long-lived access tokens** |
+
+2. Run the script:
+   ```bash
+   bash scripts/deploy.sh
+   ```
+
+   First run deploys everything. Subsequent runs deploy only what changed since the last deploy. Use `--force` to redeploy all files regardless:
+   ```bash
+   bash scripts/deploy.sh --force
+   ```
+
+---
+
+### GitHub Actions auto-deploy
+
+The workflow in `.github/workflows/deploy.yml` triggers automatically after every successful test run on `main`. It requires five **GitHub Secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `HA_HOST` | Hostname or IP of your HA instance — **must be reachable from GitHub's runners** (public IP or port-forwarded) |
+| `HA_USER` | SSH user (`root`) |
+| `HA_SSH_PORT` | SSH port (usually `22`) |
+| `HA_SSH_KEY` | Full contents of your ECDSA **private** key (`cat ~/.ssh/id_ecdsa`) |
+| `HA_TOKEN` | Long-lived access token |
+
+> **Note on reachability:** GitHub Actions runners are hosted on Microsoft Azure and cannot reach a private home network directly. Options to make your HA reachable:
+> - **Port forwarding** — forward the SSH port (and optionally 8123) on your router to your HA machine.
+> - **Tailscale** — install the Tailscale add-on on HA and the [Tailscale GitHub Action](https://github.com/tailscale/github-action) in the workflow for a zero-config VPN tunnel (no port forwarding needed, recommended).
+> - **Cloudflare Tunnel** — expose HA via a Cloudflare Tunnel without opening router ports.
+
+---
+
+### Samba alternative
+
+If you prefer not to set up SSH, the **Samba** app lets you access `config/` as a network share. Install it from **Settings → Apps → App Store**, then:
+
+1. Mount the share on your machine (`\\<ha-ip>\homeassistant` on Windows, `smb://<ha-ip>/homeassistant` on macOS).
+2. Copy the contents of `templates/` into `homeassistant/custom_templates/` in the mounted share.
+3. Trigger a reload manually: **Developer Tools → Actions → `homeassistant.reload_custom_templates`**.
+
+This approach is LAN-only and does not support automated deployment from GitHub Actions.
 
 ---
 

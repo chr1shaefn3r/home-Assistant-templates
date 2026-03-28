@@ -1,0 +1,42 @@
+name: Deploy to Home Assistant
+
+# Runs automatically after every successful test run on main.
+# Requires the following GitHub Secrets to be configured:
+#   HA_HOST      — hostname or IP of your HA instance (must be reachable from GitHub runners)
+#   HA_USER      — SSH user (root on HA OS)
+#   HA_SSH_PORT  — SSH port (default: 22)
+#   HA_SSH_KEY   — full content of your ECDSA private key
+#   HA_TOKEN     — long-lived HA access token
+
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HA_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Add HA host to known_hosts
+        run: |
+          ssh-keyscan -p "${{ secrets.HA_SSH_PORT || '22' }}" "${{ secrets.HA_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy templates
+        env:
+          HA_HOST: ${{ secrets.HA_HOST }}
+          HA_USER: ${{ secrets.HA_USER }}
+          HA_SSH_PORT: ${{ secrets.HA_SSH_PORT }}
+          HA_SSH_KEY: ~/.ssh/deploy_key
+          HA_TOKEN: ${{ secrets.HA_TOKEN }}
+        run: bash scripts/deploy.sh --force
