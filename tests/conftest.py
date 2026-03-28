@@ -26,6 +26,7 @@ def make_environment(
         undefined=jinja2.Undefined,
         trim_blocks=True,
         lstrip_blocks=True,
+        keep_trailing_newline=True,
     )
 
     # ── HA global functions ──────────────────────────────────────────────────
