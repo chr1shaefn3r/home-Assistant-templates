@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import jinja2
+import jinja2.sandbox
 import pytest
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
@@ -21,7 +22,7 @@ def make_environment(
     _attributes = attributes or {}
     _now = now or datetime(2026, 1, 1, 8, 0, 0)
 
-    env = jinja2.Environment(
+    env = jinja2.sandbox.ImmutableSandboxedEnvironment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
         undefined=jinja2.Undefined,
         trim_blocks=True,
