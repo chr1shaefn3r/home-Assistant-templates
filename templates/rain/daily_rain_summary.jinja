@@ -15,12 +15,12 @@
 {% set ns.groups = ns.groups + [ns.current] %}
 {% if rainy | length == forecast | length %}Heute regnet es den ganzen Tag
 {% else %}
-{% set parts = [] %}
+{% set ns2 = namespace(parts=[]) %}
 {% for group in ns.groups %}
 {% set start = (group[0].datetime | as_datetime).hour %}
 {% set end = (group[-1].datetime | as_datetime).hour + 1 %}
-{% set _ = parts.append("von " ~ start ~ " bis " ~ end ~ " Uhr") %}
+{% set ns2.parts = ns2.parts + ["von " ~ start ~ " bis " ~ end ~ " Uhr"] %}
 {% endfor %}
-Heute regnet es {{ parts | join(" und ") }}
+Heute regnet es {{ ns2.parts | join(" und ") }}
 {% endif %}
 {% endif %}
