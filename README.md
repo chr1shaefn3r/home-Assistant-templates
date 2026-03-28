@@ -14,6 +14,7 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
   - [Precondition: File Editor app](#precondition-file-editor-app)
+  - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
   - [Copying the templates](#copying-the-templates)
   - [Verifying the deployment](#verifying-the-deployment)
 - [Developer guide](#developer-guide)
@@ -239,7 +240,7 @@ data:
 
 ### Precondition: File Editor app
 
-The templates need to be placed inside the Home Assistant `config/` directory. The easiest way to manage files on your HA instance is the **File Editor** app.
+The templates need to be placed inside the Home Assistant `config/custom_templates/` directory. The easiest way to manage files on your HA instance is the **File Editor** app.
 
 **Install File Editor:**
 
@@ -252,17 +253,28 @@ The templates need to be placed inside the Home Assistant `config/` directory. T
 
 ---
 
+### Setting up the custom_templates directory
+
+Home Assistant looks for `{% include %}` targets in `config/custom_templates/`. Create the directory if it does not exist yet:
+
+1. Open **File editor**.
+2. Click the folder icon in the top-left to open the directory browser.
+3. Navigate to the root (`/config/`).
+4. Create a new folder called `custom_templates`.
+
+---
+
 ### Copying the templates
 
-Home Assistant resolves `{% include %}` paths relative to the `config/` directory. The repository's `templates/` directory maps directly to `config/`. Copy each file using File Editor:
+The repository's `templates/` directory maps directly to `config/custom_templates/`. Copy each file using File Editor:
 
 | Repository path | HA path |
 |---|---|
-| `templates/greeting/greeting.jinja` | `config/greeting/greeting.jinja` |
-| `templates/weather/daily_weather_summary.jinja` | `config/weather/daily_weather_summary.jinja` |
-| `templates/rain/daily_rain_summary.jinja` | `config/rain/daily_rain_summary.jinja` |
-| `templates/family_calendar/daily_family_summary.jinja` | `config/family_calendar/daily_family_summary.jinja` |
-| `templates/greeting_day_summary.jinja` | `config/greeting_day_summary.jinja` |
+| `templates/greeting/greeting.jinja` | `custom_templates/greeting/greeting.jinja` |
+| `templates/weather/daily_weather_summary.jinja` | `custom_templates/weather/daily_weather_summary.jinja` |
+| `templates/rain/daily_rain_summary.jinja` | `custom_templates/rain/daily_rain_summary.jinja` |
+| `templates/family_calendar/daily_family_summary.jinja` | `custom_templates/family_calendar/daily_family_summary.jinja` |
+| `templates/greeting_day_summary.jinja` | `custom_templates/greeting_day_summary.jinja` |
 
 For each file:
 
