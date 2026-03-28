@@ -2,6 +2,26 @@
 
 A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant.io/), together with a lightweight Python test harness that lets you unit-test them without a running HA instance.
 
+## Table of contents
+
+- [Template groups](#template-groups)
+  - [Greeting](#greeting-templatesgreeting)
+  - [Weather](#weather-templatesweather)
+  - [Rain](#rain-templatesrain)
+  - [Family Calendar](#family-calendar-templatesfamily_calendar)
+  - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
+- [Deploying to Home Assistant](#deploying-to-home-assistant)
+  - [Precondition: File Editor add-on](#precondition-file-editor-add-on)
+  - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
+  - [Copying the templates](#copying-the-templates)
+  - [Verifying the deployment](#verifying-the-deployment)
+- [Developer guide](#developer-guide)
+  - [Prerequisites](#prerequisites)
+  - [Local setup](#local-setup)
+  - [Running the tests](#running-the-tests)
+  - [VSCode setup](#vscode-setup)
+  - [CI](#ci)
+
 ## Template groups
 
 ### Greeting (`templates/greeting/`)
