@@ -155,6 +155,7 @@ data:
 
 | Scenario | Output |
 |---|---|
+| No events | `Es sind keine Familientermine für den Rest des Tages geplant.` |
 | One full-day event | `Folgende Familientermine sind für heute noch geplant:`<br>`Osterfeier, Ganztagestermin` |
 | One timed appointment | `Folgende Familientermine sind für heute noch geplant:`<br>`Kinderarzt von 10 Uhr 30 bis 11 Uhr` |
 | Multiple events | Each event on its own line, sorted chronologically |
