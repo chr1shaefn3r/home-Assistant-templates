@@ -16,6 +16,7 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Precondition: File Editor app](#precondition-file-editor-app)
   - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
   - [Copying the templates](#copying-the-templates)
+  - [Reloading custom templates](#reloading-custom-templates)
   - [Verifying the deployment](#verifying-the-deployment)
 - [Developer guide](#developer-guide)
   - [Prerequisites](#prerequisites)
@@ -281,6 +282,16 @@ For each file:
 1. Open **File editor** and navigate to the target folder (create sub-folders as needed via the folder icon).
 2. Click the **+** icon to create a new file with the correct name.
 3. Paste the contents from this repository and save.
+
+---
+
+### Reloading custom templates
+
+After adding or changing any file in `custom_templates/`, Home Assistant must reload the directory before the changes take effect. Trigger the reload action once from **Developer Tools → Actions**:
+
+- Action: `homeassistant.reload_custom_templates`
+
+No data payload is required. Click **Perform action** to confirm. HA will re-read all files in `custom_templates/` immediately — no restart needed.
 
 ---
 
