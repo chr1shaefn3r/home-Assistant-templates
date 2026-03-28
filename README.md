@@ -1,5 +1,7 @@
 # Home Assistant Templates
 
+> **Disclaimer:** This codebase was entirely written by [Claude](https://www.anthropic.com/claude) (Anthropic's AI assistant) under human supervision.
+
 A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant.io/), together with a lightweight Python test harness that lets you unit-test them without a running HA instance.
 
 ## Table of contents
