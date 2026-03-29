@@ -19,7 +19,7 @@ env:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && secrets.HA_HOST != '' }}
     runs-on: ubuntu-latest
 
     steps:
