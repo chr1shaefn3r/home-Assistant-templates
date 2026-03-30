@@ -11,11 +11,42 @@ import pytest
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 
 
+class _State:
+    """Minimal HA state object for use in tests (mirrors HA's State class)."""
+
+    def __init__(self, entity_id: str, state: str, attributes: dict | None = None):
+        self.entity_id = entity_id
+        self.state = state
+        self.attributes = attributes or {}
+        self.name = self.attributes.get("friendly_name", entity_id)
+
+
+class _StatesProxy:
+    """Mimics HA's `states` global: callable for single entity lookup AND
+    attribute access for domain iteration (e.g. `states.sensor`)."""
+
+    def __init__(self, states_dict: dict, state_objects: list[_State]):
+        self._states = states_dict
+        # Group state objects by domain (the part before the first dot)
+        self._domains: dict[str, list[_State]] = {}
+        for obj in state_objects:
+            domain = obj.entity_id.split(".")[0]
+            self._domains.setdefault(domain, []).append(obj)
+
+    def __call__(self, entity_id: str) -> str:
+        return self._states.get(entity_id, "unknown")
+
+    def __getattr__(self, domain: str) -> list[_State]:
+        # Only called for attributes not found via normal lookup
+        return self._domains.get(domain, [])
+
+
 def make_environment(
     *,
     states: dict[str, str] | None = None,
     attributes: dict[str, dict] | None = None,
     now: datetime | None = None,
+    state_objects: list[_State] | None = None,
 ) -> jinja2.Environment:
     """Return a Jinja2 env with HA globals and filters stubbed out."""
     _states = states or {}
@@ -31,7 +62,7 @@ def make_environment(
     )
 
     # ── HA global functions ──────────────────────────────────────────────────
-    env.globals["states"] = lambda entity_id: _states.get(entity_id, "unknown")
+    env.globals["states"] = _StatesProxy(_states, state_objects or [])
     env.globals["is_state"] = lambda entity_id, state: _states.get(entity_id) == state
     env.globals["state_attr"] = (
         lambda entity_id, attr: _attributes.get(entity_id, {}).get(attr)
@@ -64,7 +95,7 @@ def make_environment(
 
 @pytest.fixture
 def render():
-    """Render helper: render(template_path, states={}, attributes={}, now=dt, variables={})."""
+    """Render helper: render(template_path, states={}, attributes={}, now=dt, variables={}, state_objects=[])."""
 
     def _render(
         template_path: str,
@@ -73,8 +104,14 @@ def render():
         attributes: dict[str, dict] | None = None,
         now: datetime | None = None,
         variables: dict | None = None,
+        state_objects: list[_State] | None = None,
     ) -> str:
-        env = make_environment(states=states, attributes=attributes, now=now)
+        env = make_environment(
+            states=states,
+            attributes=attributes,
+            now=now,
+            state_objects=state_objects,
+        )
         tmpl = env.get_template(template_path)
         return tmpl.render(**(variables or {})).strip()
 
