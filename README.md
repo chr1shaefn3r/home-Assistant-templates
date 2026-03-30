@@ -12,6 +12,7 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Rain](#rain-templatesrain)
   - [Family Calendar](#family-calendar-templatesfamily_calendar)
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
+  - [Battery-powered Sensors](#battery-powered-sensors-templatesbattery_sensors)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
   - [Precondition: File Editor app](#precondition-file-editor-app)
   - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
@@ -245,6 +246,55 @@ data:
 
 ---
 
+### Battery-powered Sensors (`templates/battery_sensors/`)
+
+| Template | Purpose |
+|---|---|
+| `low_battery_summary.jinja` | Reports all battery-powered sensors below a configurable threshold |
+
+**How battery sensors are discovered:** The template reads `states.sensor` at render time and automatically finds every entity with `device_class: battery`. No manual list is required — new battery-powered devices are picked up immediately.
+
+To see which entities will be included, paste this into **Developer Tools → Template**:
+
+```jinja2
+{{ states.sensor
+   | selectattr('attributes.device_class', 'eq', 'battery')
+   | map(attribute='entity_id') | list }}
+```
+
+**Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off.
+
+**Output examples:**
+
+| Scenario | Output |
+|---|---|
+| No battery sensors registered | `Keine batteriebetriebenen Sensoren gefunden.` |
+| All sensors above threshold | *(empty — no notification)* |
+| One sensor low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%)` |
+| Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%), Türsensor (8%)` |
+
+**Home Assistant usage:**
+
+```yaml
+action: notify.mobile_app
+data:
+  message: >
+    {% set threshold = 20 %}
+    {% include 'battery_sensors/low_battery_summary.jinja' %}
+```
+
+To use a custom threshold:
+
+```yaml
+action: notify.mobile_app
+data:
+  message: >
+    {% set threshold = 30 %}
+    {% include 'battery_sensors/low_battery_summary.jinja' %}
+```
+
+---
+
 ## Deploying to Home Assistant
 
 ### Precondition: File Editor app
@@ -283,6 +333,7 @@ The repository's `templates/` directory maps directly to `config/custom_template
 | `templates/weather/daily_weather_summary.jinja` | `custom_templates/weather/daily_weather_summary.jinja` |
 | `templates/rain/daily_rain_summary.jinja` | `custom_templates/rain/daily_rain_summary.jinja` |
 | `templates/family_calendar/daily_family_summary.jinja` | `custom_templates/family_calendar/daily_family_summary.jinja` |
+| `templates/battery_sensors/low_battery_summary.jinja` | `custom_templates/battery_sensors/low_battery_summary.jinja` |
 | `templates/greeting_day_summary.jinja` | `custom_templates/greeting_day_summary.jinja` |
 
 For each file:
