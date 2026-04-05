@@ -11,6 +11,7 @@
 {% set ns.low = ns.low + [s.name ~ ' (' ~ s.state ~ '%)'] %}
 {% endif %}
 {% endfor %}
-{% if ns.low | length > 0 %}Folgende Geräte haben niedrigen Akkustand: {{ ns.low | join(', ') }}
+{% if ns.low | length == 1 %}Folgendes Gerät hat einen niedrigen Akkustand: {{ ns.low | join(', ') }}
+{% elif ns.low | length > 1 %}Folgende Geräte haben niedrigen Akkustand: {{ ns.low | join(', ') }}
 {% endif %}
 {% endif %}

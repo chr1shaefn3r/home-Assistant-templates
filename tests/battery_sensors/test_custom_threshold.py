@@ -18,4 +18,4 @@ def test_sensor_fine_at_default_threshold(render):
 def test_sensor_low_at_custom_threshold(render):
     # 35% is below a custom 50% threshold — reported
     result = render(TEMPLATE, state_objects=SENSORS, variables={"threshold": 50})
-    assert result == "Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (35%)"
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (35%)"
