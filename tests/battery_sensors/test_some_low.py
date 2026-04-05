@@ -11,4 +11,4 @@ SENSORS_ONE_LOW = [
 
 def test_one_low_battery_reported(render):
     result = render(TEMPLATE, state_objects=SENSORS_ONE_LOW)
-    assert result == "Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%)"
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (15%)"
