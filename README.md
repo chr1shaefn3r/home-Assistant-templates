@@ -264,14 +264,30 @@ To see which entities will be included, paste this into **Developer Tools → Te
 
 **Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off.
 
+**Excluding rechargeable devices (phones, tablets, …):**
+
+HA does not expose battery type metadata natively, so rechargeable devices must be excluded via an HA label. One-time setup:
+
+1. Go to **Settings → Labels** and create a label called `rechargeable`.
+2. Go to **Settings → Devices & Services**, open the device (e.g. your phone), and assign the `rechargeable` label to its battery sensor entity.
+
+The template automatically skips any entity carrying that label — no further configuration needed. New rechargeable devices are excluded the moment you label them.
+
+To preview which entities will be excluded, paste this into **Developer Tools → Template**:
+
+```jinja2
+{{ label_entities('rechargeable') }}
+```
+
 **Output examples:**
 
 | Scenario | Output |
 |---|---|
 | No battery sensors registered | `Keine batteriebetriebenen Sensoren gefunden.` |
 | All sensors above threshold | *(empty — no notification)* |
-| One sensor low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%)` |
+| One sensor low | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (15%)` |
 | Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%), Türsensor (8%)` |
+| Low sensor is labelled `rechargeable` | *(excluded — no notification)* |
 
 **Home Assistant usage:**
 

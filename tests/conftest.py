@@ -47,6 +47,7 @@ def make_environment(
     attributes: dict[str, dict] | None = None,
     now: datetime | None = None,
     state_objects: list[_State] | None = None,
+    labels: dict[str, list[str]] | None = None,
 ) -> jinja2.Environment:
     """Return a Jinja2 env with HA globals and filters stubbed out."""
     _states = states or {}
@@ -77,6 +78,8 @@ def make_environment(
     )
     env.globals["as_datetime"] = datetime.fromisoformat
     env.filters["as_datetime"] = datetime.fromisoformat
+    _labels = labels or {}
+    env.globals["label_entities"] = lambda label: _labels.get(label, [])
 
     # ── HA filters (override Jinja2 defaults to support default args) ────────
     env.filters["float"] = lambda value, default=0.0: (
@@ -105,12 +108,14 @@ def render():
         now: datetime | None = None,
         variables: dict | None = None,
         state_objects: list[_State] | None = None,
+        labels: dict[str, list[str]] | None = None,
     ) -> str:
         env = make_environment(
             states=states,
             attributes=attributes,
             now=now,
             state_objects=state_objects,
+            labels=labels,
         )
         tmpl = env.get_template(template_path)
         return tmpl.render(**(variables or {})).strip()

@@ -1,7 +1,9 @@
 {% set threshold = threshold | default(20) %}
+{% set rechargeable = label_entities('rechargeable') %}
 {% set battery_sensors = states.sensor
      | selectattr('attributes.device_class', 'defined')
      | selectattr('attributes.device_class', 'eq', 'battery')
+     | rejectattr('entity_id', 'in', rechargeable)
      | list %}
 {% if battery_sensors | length == 0 %}Keine batteriebetriebenen Sensoren gefunden.
 {% else %}
