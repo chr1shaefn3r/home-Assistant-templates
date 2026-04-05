@@ -22,11 +22,19 @@
 {% for label, display in battery_type_map.items() %}
 {% if s.entity_id in label_entities(label) %}{% set ns2.type = display %}{% endif %}
 {% endfor %}
-{% if ns2.type %}
-{% set ns.low = ns.low + [s.name ~ ' (' ~ s.state ~ '%, ' ~ ns2.type ~ ')'] %}
-{% else %}
-{% set ns.low = ns.low + [s.name ~ ' (' ~ s.state ~ '%)'] %}
+{% set ns3 = namespace(parts=[s.state ~ '%']) %}
+{% if ns2.type %}{% set ns3.parts = ns3.parts + [ns2.type] %}{% endif %}
+{% set helper_id = 'input_datetime.' ~ s.entity_id.split('.')[1] ~ '_replaced' %}
+{% set replaced_state = states(helper_id) %}
+{% if replaced_state not in ['unknown', 'unavailable', ''] %}
+{% set days_since = ((now().timestamp() - as_datetime(replaced_state).timestamp()) / 86400) %}
+{% set capacity_used = 100 - s.state | int(0) %}
+{% if days_since > 1 and capacity_used > 0 %}
+{% set days_remaining = (s.state | int(0) / (capacity_used / days_since)) | round(0) | int %}
+{% set ns3.parts = ns3.parts + ['~' ~ days_remaining ~ ' Tage'] %}
 {% endif %}
+{% endif %}
+{% set ns.low = ns.low + [s.name ~ ' (' ~ ns3.parts | join(', ') ~ ')'] %}
 {% endif %}
 {% endfor %}
 {% if ns.low | length == 1 %}Folgendes Gerät hat einen niedrigen Akkustand: {{ ns.low | join(', ') }}
