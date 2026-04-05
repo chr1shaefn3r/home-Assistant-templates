@@ -294,14 +294,34 @@ To preview which entities carry a given battery type label, use **Developer Tool
 {{ label_entities('battery_aa') }}
 ```
 
+**Showing remaining runtime:**
+
+The template can estimate how many days of battery life remain based on the observed discharge rate since the last battery replacement. This requires one `input_datetime` helper per device.
+
+Naming convention: `input_datetime.<entity_suffix>_replaced`
+
+| Sensor entity | Helper entity |
+|---|---|
+| `sensor.motion_battery` | `input_datetime.motion_battery_replaced` |
+| `sensor.door_battery` | `input_datetime.door_battery_replaced` |
+
+One-time setup per device:
+
+1. Go to **Settings → Devices & Services → Helpers** and create a **Date/Time** helper named after the convention above.
+2. After replacing the batteries, set the helper value to today's date.
+
+The template computes `days_remaining = current_level / (capacity_used / days_since_replacement)` and appends `~N Tage` to the alert. Guards: if the helper is missing or unavailable, the replacement was less than a day ago, or the sensor is still at 100%, no estimate is shown.
+
 **Output examples:**
 
 | Scenario | Output |
 |---|---|
 | No battery sensors registered | `Keine batteriebetriebenen Sensoren gefunden.` |
 | All sensors above threshold | *(empty — no notification)* |
+| One sensor low, no labels | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%)` |
 | One sensor low, type labelled | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, CR2032)` |
-| One sensor low, no type label | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%)` |
+| One sensor low, with runtime estimate | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, ~8 Tage)` |
+| One sensor low, type + runtime | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, CR2032, ~8 Tage)` |
 | Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (8%, AA), Türsensor (12%)` |
 | Low sensor is labelled `rechargeable` | *(excluded — no notification)* |
 
