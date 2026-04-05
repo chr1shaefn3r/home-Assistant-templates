@@ -1,5 +1,13 @@
 {% set threshold = threshold | default(20) %}
 {% set rechargeable = label_entities('rechargeable') %}
+{% set battery_type_map = {
+  'battery_aa':     'AA',
+  'battery_aaa':    'AAA',
+  'battery_cr2032': 'CR2032',
+  'battery_cr2450': 'CR2450',
+  'battery_9v':     '9V',
+  'battery_d':      'D'
+} %}
 {% set battery_sensors = states.sensor
      | selectattr('attributes.device_class', 'defined')
      | selectattr('attributes.device_class', 'eq', 'battery')
@@ -10,7 +18,15 @@
 {% set ns = namespace(low=[]) %}
 {% for s in battery_sensors %}
 {% if s.state not in ['unavailable', 'unknown'] and s.state | int(-1) <= threshold %}
+{% set ns2 = namespace(type='') %}
+{% for label, display in battery_type_map.items() %}
+{% if s.entity_id in label_entities(label) %}{% set ns2.type = display %}{% endif %}
+{% endfor %}
+{% if ns2.type %}
+{% set ns.low = ns.low + [s.name ~ ' (' ~ s.state ~ '%, ' ~ ns2.type ~ ')'] %}
+{% else %}
 {% set ns.low = ns.low + [s.name ~ ' (' ~ s.state ~ '%)'] %}
+{% endif %}
 {% endif %}
 {% endfor %}
 {% if ns.low | length == 1 %}Folgendes Gerät hat einen niedrigen Akkustand: {{ ns.low | join(', ') }}

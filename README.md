@@ -271,12 +271,27 @@ HA does not expose battery type metadata natively, so rechargeable devices must 
 1. Go to **Settings → Labels** and create a label called `rechargeable`.
 2. Go to **Settings → Devices & Services**, open the device (e.g. your phone), and assign the `rechargeable` label to its battery sensor entity.
 
-The template automatically skips any entity carrying that label — no further configuration needed. New rechargeable devices are excluded the moment you label them.
+The template automatically skips any entity carrying that label. New rechargeable devices are excluded the moment you label them.
 
-To preview which entities will be excluded, paste this into **Developer Tools → Template**:
+**Showing the battery type:**
+
+Assign a battery type label to each sensor entity so the template can include it in the output. Supported labels:
+
+| Label | Displayed as |
+|---|---|
+| `battery_aa` | AA |
+| `battery_aaa` | AAA |
+| `battery_cr2032` | CR2032 |
+| `battery_cr2450` | CR2450 |
+| `battery_9v` | 9V |
+| `battery_d` | D |
+
+One-time setup per device: **Settings → Devices & Services** → open device → assign the matching label to its battery sensor entity. If no battery type label is set, the type is simply omitted from the output.
+
+To preview which entities carry a given battery type label, use **Developer Tools → Template**:
 
 ```jinja2
-{{ label_entities('rechargeable') }}
+{{ label_entities('battery_aa') }}
 ```
 
 **Output examples:**
@@ -285,8 +300,9 @@ To preview which entities will be excluded, paste this into **Developer Tools �
 |---|---|
 | No battery sensors registered | `Keine batteriebetriebenen Sensoren gefunden.` |
 | All sensors above threshold | *(empty — no notification)* |
-| One sensor low | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (15%)` |
-| Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (15%), Türsensor (8%)` |
+| One sensor low, type labelled | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, CR2032)` |
+| One sensor low, no type label | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%)` |
+| Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (8%, AA), Türsensor (12%)` |
 | Low sensor is labelled `rechargeable` | *(excluded — no notification)* |
 
 **Home Assistant usage:**
