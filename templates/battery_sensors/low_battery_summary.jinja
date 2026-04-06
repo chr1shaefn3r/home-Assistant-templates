@@ -31,7 +31,7 @@
 {% set capacity_used = 100 - s.state | int(0) %}
 {% if days_since > 1 and capacity_used > 0 %}
 {% set days_remaining = (s.state | int(0) / (capacity_used / days_since)) | round(0) | int %}
-{% set ns3.parts = ns3.parts + ['~' ~ days_remaining ~ ' Tage'] %}
+{% set ns3.parts = ns3.parts + ['ungefähr ' ~ days_remaining ~ ' Tage'] %}
 {% endif %}
 {% endif %}
 {% set ns.low = ns.low + [s.name ~ ' (' ~ ns3.parts | join(', ') ~ ')'] %}

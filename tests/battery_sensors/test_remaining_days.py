@@ -28,14 +28,14 @@ MOTION = _State(
 
 
 def test_remaining_days_shown_when_helper_present(render):
-    """90 days since replacement, used 90%, 10% left → daily_drain=1.0 → ~10 Tage."""
+    """90 days since replacement, used 90%, 10% left → daily_drain=1.0 → ungefähr 10 Tage."""
     result = render(
         TEMPLATE,
         now=datetime(2026, 3, 27, 0, 0, 0),
         state_objects=[MOTION],
         states={"input_datetime.motion_battery_replaced": "2025-12-27"},
     )
-    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (10%, ~10 Tage)"
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (10%, ungefähr 10 Tage)"
 
 
 def test_remaining_days_with_battery_type(render):
@@ -47,7 +47,7 @@ def test_remaining_days_with_battery_type(render):
         states={"input_datetime.motion_battery_replaced": "2025-12-27"},
         labels={"battery_cr2032": ["sensor.motion_battery"]},
     )
-    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (10%, CR2032, ~10 Tage)"
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (10%, CR2032, ungefähr 10 Tage)"
 
 
 def test_no_estimate_when_helper_missing(render):
