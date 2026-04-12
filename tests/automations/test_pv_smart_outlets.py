@@ -5,8 +5,10 @@ All tests use the `pv_sim` fixture (AutomationSimulator pre-loaded with the
 YAML, outlet starts OFF, sensor starts at 0 W).
 
 Thresholds under test:
-  Turn ON  when surplus crosses above 20 W   (outlet_watts = 20)
-  Turn OFF when surplus crosses below 15 W   (outlet_watts * 0.75 = 15)
+  Turn ON  when surplus crosses above 25 W   (outlet_watts + hysteresis_watts = 20 + 5)
+  Turn OFF when surplus crosses below 15 W   (outlet_watts - hysteresis_watts = 20 - 5)
+
+Dead zone (no action): [15 W, 25 W]
 """
 from tests.automations.simulation import AutomationSimulator, ServiceCall
 
@@ -14,16 +16,16 @@ from tests.automations.simulation import AutomationSimulator, ServiceCall
 # ── ON trigger: upward crossings ──────────────────────────────────────────────
 
 def test_turn_on_when_surplus_crosses_above_threshold(pv_sim: AutomationSimulator):
-    """0 W → 25 W: surplus crosses above 20 W, outlet is off → turn_on fires."""
-    pv_sim.update_state("sensor.pv_grid_return_power", "25")
+    """0 W → 30 W: surplus crosses above 25 W, outlet is off → turn_on fires."""
+    pv_sim.update_state("sensor.pv_grid_return_power", "30")
     assert pv_sim.service_calls == [
         ServiceCall("switch.turn_on", ["switch.smart_outlet_1"])
     ]
 
 
 def test_turn_on_at_one_watt_above_threshold(pv_sim: AutomationSimulator):
-    """0 W → 21 W: barely crosses above 20 W → turn_on fires."""
-    pv_sim.update_state("sensor.pv_grid_return_power", "21")
+    """0 W → 26 W: barely crosses above 25 W → turn_on fires."""
+    pv_sim.update_state("sensor.pv_grid_return_power", "26")
     assert pv_sim.service_calls == [
         ServiceCall("switch.turn_on", ["switch.smart_outlet_1"])
     ]
@@ -48,6 +50,20 @@ def test_no_turn_on_when_outlet_already_on(pv_sim: AutomationSimulator):
     This prevents repeated service calls when the sensor oscillates above threshold.
     """
     pv_sim.set_state("switch.smart_outlet_1", "on")
+    pv_sim.update_state("sensor.pv_grid_return_power", "30")
+    assert pv_sim.service_calls == []
+
+
+# ── ON buffer zone (new requirement) ─────────────────────────────────────────
+
+def test_no_turn_on_when_surplus_in_on_buffer_zone(pv_sim: AutomationSimulator):
+    """0 W → 21 W: above outlet draw (20 W) but inside the 5 W ON buffer → must NOT fire."""
+    pv_sim.update_state("sensor.pv_grid_return_power", "21")
+    assert pv_sim.service_calls == []
+
+
+def test_no_turn_on_at_new_on_threshold_exactly(pv_sim: AutomationSimulator):
+    """0 W → 25 W: exactly at the new ON threshold — does NOT cross above it → no trigger."""
     pv_sim.update_state("sensor.pv_grid_return_power", "25")
     assert pv_sim.service_calls == []
 
@@ -96,23 +112,23 @@ def test_no_turn_off_when_outlet_already_off(pv_sim: AutomationSimulator):
 
 def test_no_action_while_sensor_oscillates_in_hysteresis_band(pv_sim: AutomationSimulator):
     """
-    Outlet is on, sensor fluctuates between 15 W and 20 W (inclusive): no state change.
+    Outlet is on, sensor fluctuates anywhere in the dead zone [15 W, 25 W]: no state change.
 
-    Values in [15, 20] cross neither the ON threshold (>20) nor the OFF
+    Values in this range cross neither the ON threshold (>25) nor the OFF
     threshold (<15), so neither automation fires.
     """
     pv_sim.set_state("switch.smart_outlet_1", "on")
-    pv_sim.set_state("sensor.pv_grid_return_power", "20")
+    pv_sim.set_state("sensor.pv_grid_return_power", "25")
 
-    for watts in ["17", "19", "15", "18"]:
+    for watts in ["17", "21", "15", "24", "25"]:
         pv_sim.update_state("sensor.pv_grid_return_power", watts)
 
     assert pv_sim.service_calls == []
 
 
 def test_no_action_while_outlet_off_sensor_stays_below_on_threshold(pv_sim: AutomationSimulator):
-    """Outlet is off, sensor fluctuates between 5 W and 20 W (never strictly above 20): stays off."""
-    for watts in ["5", "12", "18", "20", "12"]:
+    """Outlet is off, sensor fluctuates between 5 W and 25 W (never strictly above 25): stays off."""
+    for watts in ["5", "12", "20", "25", "18"]:
         pv_sim.update_state("sensor.pv_grid_return_power", watts)
     assert pv_sim.service_calls == []
 
@@ -124,7 +140,7 @@ def test_full_on_off_cycle(pv_sim: AutomationSimulator):
     Complete lifecycle: surplus rises, outlet turns on; surplus drops, outlet turns off.
 
     State sequence:
-      0 W  → 30 W : crosses above 20 W → turn_on
+      0 W  → 30 W : crosses above 25 W → turn_on
       30 W → 8 W  : crosses below 15 W → turn_off
     """
     pv_sim.update_state("sensor.pv_grid_return_power", "30")
@@ -145,7 +161,7 @@ def test_repeated_on_off_cycles(pv_sim: AutomationSimulator):
     """
     pv_sim.update_state("sensor.pv_grid_return_power", "30")  # turn on
     pv_sim.update_state("sensor.pv_grid_return_power", "8")   # turn off
-    pv_sim.update_state("sensor.pv_grid_return_power", "25")  # turn on again
+    pv_sim.update_state("sensor.pv_grid_return_power", "26")  # turn on again
     pv_sim.update_state("sensor.pv_grid_return_power", "5")   # turn off again
 
     assert len(pv_sim.service_calls) == 4
