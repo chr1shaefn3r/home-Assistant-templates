@@ -49,3 +49,9 @@ def test_sensor_above_threshold_type_label_irrelevant(render):
     result = render(TEMPLATE, state_objects=[high],
                     labels={"battery_aa": ["sensor.motion_battery"]})
     assert result == ""
+
+
+def test_multi_battery_label(render):
+    result = render(TEMPLATE, state_objects=[MOTION],
+                    labels={"battery_aaa_2": ["sensor.motion_battery"]})
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, 2x AAA)"
