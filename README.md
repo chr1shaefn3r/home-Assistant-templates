@@ -1,8 +1,8 @@
-# Home Assistant Templates
+# Home Assistant Templates & Automations
 
 > **Disclaimer:** This codebase was entirely written by [Claude](https://www.anthropic.com/claude) (Anthropic's AI assistant) under human supervision.
 
-A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant.io/), together with a lightweight Python test harness that lets you unit-test them without a running HA instance.
+A collection of Jinja2 templates and YAML automations for [Home Assistant](https://www.home-assistant.io/), together with a lightweight Python test harness that lets you unit-test both without a running HA instance.
 
 ## Table of contents
 
@@ -12,10 +12,13 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
   - [Family Calendar](#family-calendar-templatesfamily_calendar)
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
   - [Battery-powered Sensors](#battery-powered-sensors-templatesbattery_sensors)
+- [Automations](#automations)
+  - [PV Smart Outlets](#pv-smart-outlets-automationspv_smart_outletsyaml)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
   - [Precondition: File Editor app](#precondition-file-editor-app)
   - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
   - [Copying the templates](#copying-the-templates)
+  - [Copying the automations](#copying-the-automations)
   - [Reloading custom templates](#reloading-custom-templates)
   - [Verifying the deployment](#verifying-the-deployment)
 - [Automated deployment](#automated-deployment)
@@ -393,6 +396,49 @@ data:
 
 ---
 
+## Automations
+
+### PV Smart Outlets (`automations/pv_smart_outlets.yaml`)
+
+Automatically turns smart outlets on when the PV system is producing more power than the house is consuming, and off again when the surplus drops away.
+
+**Entities:**
+
+| Entity | Role |
+|---|---|
+| `sensor.pv_grid_return_power` | Watts currently being exported to the grid (positive = exporting) |
+| `switch.smart_outlet_1` | Smart outlet to control (~20 W draw) |
+
+**Logic:**
+
+| Event | Threshold | Action |
+|---|---|---|
+| Surplus rises | above 20 W (outlet draw) | Turn outlet **on** — if it was off |
+| Surplus falls | below 15 W (20 W × 0.75 hysteresis) | Turn outlet **off** — if it was on |
+
+The 25 % hysteresis gap between the on-threshold (20 W) and off-threshold (15 W) prevents rapid on/off cycling when the sensor oscillates near the boundary.
+
+**Home Assistant usage:**
+
+Copy the file contents into your `config/automations.yaml` (or include it via `automations/` — see [Copying the automations](#copying-the-automations)). Adjust the entity IDs at the top of each automation block to match your setup.
+
+**Extending to more outlets:**
+
+Duplicate both automation blocks in `pv_smart_outlets.yaml` and change only these fields in each copy:
+
+| Field | Description |
+|---|---|
+| `id` | Must be unique across all automations |
+| `alias` | Human-readable name shown in the HA UI |
+| `variables.outlet_entity` | Entity ID of the new outlet switch |
+| `variables.outlet_watts` | Rated power draw of that outlet (W) |
+
+Everything else (trigger entity, hysteresis calculation) stays unchanged.
+
+> **HA version note:** Trigger thresholds use automation variables (`above: "{{ outlet_watts }}"`), which requires Home Assistant 2023.4 or newer. For older installations replace the template strings with literal numbers: `above: 20` / `below: 15`.
+
+---
+
 ## Deploying to Home Assistant
 
 ### Precondition: File Editor app
@@ -440,6 +486,19 @@ For each file:
 1. Open **File editor** and navigate to the target folder (create sub-folders as needed via the folder icon).
 2. Click the **+** icon to create a new file with the correct name.
 3. Paste the contents from this repository and save.
+
+---
+
+### Copying the automations
+
+HA loads automations from `config/automations.yaml`. The simplest way to add the automations from this repo:
+
+1. Open **File editor** and navigate to `config/automations.yaml` (create it if it does not exist).
+2. Paste the contents of `automations/pv_smart_outlets.yaml` at the end of the file.
+3. Adjust the entity IDs (`switch.smart_outlet_1`, `sensor.pv_grid_return_power`) to match your actual devices.
+4. Reload automations: **Developer Tools → Actions → `automation.reload`**, or go to **Settings → Automations & Scenes** and click **Reload automations** in the overflow menu.
+
+If you manage automations as individual files (via `automation: !include_dir_merge_list automations/` in `configuration.yaml`), copy `automations/pv_smart_outlets.yaml` directly into your `config/automations/` directory instead.
 
 ---
 
@@ -572,7 +631,7 @@ This approach is LAN-only and does not support automated deployment from GitHub 
 ```bash
 git clone https://github.com/chr1shaefn3r/home-Assistant-templates.git
 cd home-Assistant-templates
-pip install jinja2 pytest
+pip install jinja2 pytest pyyaml
 ```
 
 ### Running the tests
@@ -581,7 +640,9 @@ pip install jinja2 pytest
 pytest -v
 ```
 
-All template tests live under `tests/`. Test files mirror the `templates/` directory structure:
+Tests are split into two layers that mirror the repo structure:
+
+**Template tests** (`tests/`) — use the `render()` fixture from `tests/conftest.py`, which sets up a Jinja2 environment with all HA globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …):
 
 ```
 templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
@@ -592,8 +653,6 @@ templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/
 templates/greeting_day_summary.jinja                 →  tests/test_greeting_day_summary.py
 ```
 
-The shared `tests/conftest.py` provides a `render()` pytest fixture that sets up a Jinja2 environment with all Home Assistant globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …). Pass entity states, attributes, the current time, or arbitrary template variables directly in each test:
-
 ```python
 def test_example(render):
     result = render(
@@ -602,6 +661,22 @@ def test_example(render):
     )
     assert "Heute bleibt es trocken" in result
 ```
+
+**Automation tests** (`tests/automations/`) — use `AutomationSimulator` from `tests/automations/simulation.py`, which parses the YAML automation file and simulates the trigger → condition → action pipeline in pure Python (no HA installation required):
+
+```
+automations/pv_smart_outlets.yaml  →  tests/automations/test_pv_smart_outlets.py
+```
+
+```python
+def test_turn_on_when_surplus_crosses_above_threshold(pv_sim):
+    pv_sim.update_state("sensor.pv_grid_return_power", "25")
+    assert pv_sim.service_calls == [
+        ServiceCall("switch.turn_on", ["switch.smart_outlet_1"])
+    ]
+```
+
+The `pv_sim` fixture (in `tests/automations/conftest.py`) provides a fresh simulator pre-loaded with `pv_smart_outlets.yaml` and sensible initial states for each test.
 
 ### VSCode setup
 
