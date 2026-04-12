@@ -1,7 +1,7 @@
 """Rain group — no rain today, but rain tomorrow scenario."""
 from datetime import datetime
 
-TEMPLATE = "rain/daily_rain_summary.jinja"
+TEMPLATE = "weather/daily_rain_summary.jinja"
 
 FORECAST_NO_RAIN_TODAY_RAIN_TOMORROW = [
     # Today (2026-03-27) — no precipitation

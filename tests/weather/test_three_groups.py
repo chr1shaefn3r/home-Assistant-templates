@@ -1,7 +1,7 @@
 """Rain group — three independent two-hour rain windows scenario."""
 from datetime import datetime
 
-TEMPLATE = "rain/daily_rain_summary.jinja"
+TEMPLATE = "weather/daily_rain_summary.jinja"
 
 # Group 1: 08:00–09:00, gap 10:00–11:00, Group 2: 12:00–13:00, gap 14:00–16:00, Group 3: 17:00–18:00
 FORECAST_THREE_GROUPS = [

@@ -1,7 +1,7 @@
 """Rain group — all-day rain scenario."""
 from datetime import datetime
 
-TEMPLATE = "rain/daily_rain_summary.jinja"
+TEMPLATE = "weather/daily_rain_summary.jinja"
 
 FORECAST_ALL_DAY_RAIN = [
     {"condition": "rainy", "datetime": "2026-03-27T05:00:00+00:00", "wind_bearing": 337.8, "cloud_coverage": 98.0, "uv_index": 0.0, "temperature": -0.1, "wind_speed": 6.8, "precipitation": 1.2, "humidity": 95},

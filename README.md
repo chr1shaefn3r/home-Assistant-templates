@@ -67,8 +67,11 @@ data:
 | Template | Purpose |
 |---|---|
 | `daily_weather_summary.jinja` | Produces a German-language summary of today's weather condition and high temperature |
+| `daily_rain_summary.jinja` | Produces a German-language rain summary for the day based on an hourly forecast |
 
-**Input:** the `forecast` list from a `weather.get_forecasts` action call (daily resolution). Uses `forecast[0]` (today's entry).
+**`daily_weather_summary.jinja`**
+
+Input: the `forecast` list from a `weather.get_forecasts` action call (daily resolution). Uses `forecast[0]` (today's entry).
 
 **Output examples:**
 
@@ -114,13 +117,9 @@ data:
 
 ---
 
-### Rain (`templates/rain/`)
+**`daily_rain_summary.jinja`**
 
-| Template | Purpose |
-|---|---|
-| `daily_rain_summary.jinja` | Produces a German-language rain summary for the day based on an hourly forecast |
-
-**Input:** the `forecast` list from a `weather.get_forecasts` action call (hourly resolution).
+Input: the `forecast` list from a `weather.get_forecasts` action call (hourly resolution).
 
 **Output examples:**
 
@@ -388,7 +387,7 @@ The repository's `templates/` directory maps directly to `config/custom_template
 |---|---|
 | `templates/greeting/greeting.jinja` | `custom_templates/greeting/greeting.jinja` |
 | `templates/weather/daily_weather_summary.jinja` | `custom_templates/weather/daily_weather_summary.jinja` |
-| `templates/rain/daily_rain_summary.jinja` | `custom_templates/rain/daily_rain_summary.jinja` |
+| `templates/weather/daily_rain_summary.jinja` | `custom_templates/weather/daily_rain_summary.jinja` |
 | `templates/family_calendar/daily_family_summary.jinja` | `custom_templates/family_calendar/daily_family_summary.jinja` |
 | `templates/battery_sensors/low_battery_summary.jinja` | `custom_templates/battery_sensors/low_battery_summary.jinja` |
 | `templates/greeting_day_summary.jinja` | `custom_templates/greeting_day_summary.jinja` |
@@ -543,8 +542,8 @@ All template tests live under `tests/`. Test files mirror the `templates/` direc
 
 ```
 templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
-templates/weather/daily_weather_summary.jinja        →  tests/weather/test_*.py
-templates/rain/daily_rain_summary.jinja              →  tests/rain/test_*.py
+templates/weather/daily_weather_summary.jinja        →  tests/weather/test_simple_daily.py
+templates/weather/daily_rain_summary.jinja           →  tests/weather/test_*rain*.py
 templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
 templates/greeting_day_summary.jinja                 →  tests/test_greeting_day_summary.py
 ```
@@ -554,7 +553,7 @@ The shared `tests/conftest.py` provides a `render()` pytest fixture that sets up
 ```python
 def test_example(render):
     result = render(
-        "rain/daily_rain_summary.jinja",
+        "weather/daily_rain_summary.jinja",
         variables={"forecast": [...]},
     )
     assert "Heute bleibt es trocken" in result
