@@ -76,8 +76,14 @@ def make_environment(
     env.globals["as_timestamp"] = (
         lambda dt: dt.timestamp() if hasattr(dt, "timestamp") else float(dt)
     )
-    env.globals["as_datetime"] = datetime.fromisoformat
-    env.filters["as_datetime"] = datetime.fromisoformat
+    def _as_datetime(value):
+        """Mirror HA's as_datetime: return datetime objects as-is, parse strings."""
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromisoformat(str(value))
+
+    env.globals["as_datetime"] = _as_datetime
+    env.filters["as_datetime"] = _as_datetime
     _labels = labels or {}
     env.globals["label_entities"] = lambda label: _labels.get(label, [])
 

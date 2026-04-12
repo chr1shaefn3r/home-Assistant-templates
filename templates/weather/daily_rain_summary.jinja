@@ -1,7 +1,7 @@
 {% set today = now().date() | string %}
 {% set today_forecast = namespace(slots=[]) %}
 {% for slot in forecast %}
-{% if slot.datetime[:10] == today %}{% set today_forecast.slots = today_forecast.slots + [slot] %}{% endif %}
+{% if (slot.datetime | as_datetime).date() | string == today %}{% set today_forecast.slots = today_forecast.slots + [slot] %}{% endif %}
 {% endfor %}
 {% set rainy = today_forecast.slots | selectattr('precipitation', 'gt', 0) | list %}
 {% if rainy | length == 0 %}Heute bleibt es trocken

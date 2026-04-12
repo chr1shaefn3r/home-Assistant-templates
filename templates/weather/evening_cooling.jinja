@@ -3,8 +3,9 @@
 {% set today = now().date() | string %}
 {% set ns = namespace(found=false, cool_hour=-1) %}
 {% for slot in forecast %}
-{% if slot.datetime[:10] == today %}
-{% set hour = (slot.datetime | as_datetime).hour %}
+{% set slot_dt = slot.datetime | as_datetime %}
+{% if slot_dt.date() | string == today %}
+{% set hour = slot_dt.hour %}
 {% if hour >= evening_start %}
 {% if slot.temperature < temperature_threshold %}
 {% if not ns.found %}
