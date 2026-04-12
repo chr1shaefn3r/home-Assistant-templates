@@ -9,7 +9,6 @@ A collection of Jinja2 templates for [Home Assistant](https://www.home-assistant
 - [Template groups](#template-groups)
   - [Greeting](#greeting-templatesgreeting)
   - [Weather](#weather-templatesweather)
-  - [Rain](#rain-templatesrain)
   - [Family Calendar](#family-calendar-templatesfamily_calendar)
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
   - [Battery-powered Sensors](#battery-powered-sensors-templatesbattery_sensors)
