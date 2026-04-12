@@ -2,19 +2,16 @@
 {% set rechargeable = label_entities('rechargeable') %}
 {% set battery_type_map = {
   'battery_aa':     'AA',
-  'battery_aa_2':   '2x AA',
-  'battery_aa_3':   '3x AA',
-  'battery_aa_4':   '4x AA',
+  'battery_aa_2':   'zwei AA Batterien',
+  'battery_aa_3':   'drei AA Batterien',
+  'battery_aa_4':   'vier AA Batterien',
   'battery_aaa':    'AAA',
-  'battery_aaa_2':  '2x AAA',
-  'battery_aaa_3':  '3x AAA',
-  'battery_aaa_4':  '4x AAA',
+  'battery_aaa_2':  'zwei AAA Batterien',
+  'battery_aaa_3':  'drei AAA Batterien',
+  'battery_aaa_4':  'vier AAA Batterien',
   'battery_cr2032': 'CR2032',
   'battery_cr2450': 'CR2450',
-  'battery_9v':     '9V',
-  'battery_d':      'D',
-  'battery_d_2':    '2x D',
-  'battery_d_4':    '4x D'
+  'battery_9v':     '9V'
 } %}
 {% set battery_sensors = states.sensor
      | selectattr('attributes.device_class', 'defined')
