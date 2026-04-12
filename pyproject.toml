@@ -2,7 +2,7 @@
 name = "ha-template-tests"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["jinja2>=3.0", "pytest>=7.0"]
+dependencies = ["jinja2>=3.0", "pytest>=7.0", "pyyaml>=6.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

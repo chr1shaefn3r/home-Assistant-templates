@@ -1,0 +1,75 @@
+# PV Smart Outlet Controller
+# ───────────────────────────────────────────────────────────────────
+# Turns smart outlets on/off based on how much power the PV system
+# is currently exporting to the grid.
+#
+# Sensor : sensor.pv_grid_return_power   (W, positive = export to grid)
+# Outlet : switch.smart_outlet_1         (~20 W draw)
+#
+# Hysteresis design
+# ─────────────────
+#   Turn ON  when surplus  > outlet_watts            (e.g. > 20 W)
+#   Turn OFF when surplus  < outlet_watts * 0.75     (e.g. < 15 W)
+#
+#   The 25 % hysteresis gap prevents rapid on/off cycling when the
+#   sensor reading oscillates near the threshold.
+#
+# Extending to more outlets
+# ─────────────────────────
+#   Duplicate both automations below (the ON block and the OFF block)
+#   and adjust in each copy:
+#     • id           — must be unique across all automations
+#     • alias        — human-readable name shown in the HA UI
+#     • variables.outlet_entity  — entity_id of the new outlet switch
+#     • variables.outlet_watts   — rated power draw of that outlet (W)
+#   Everything else (trigger entity, hysteresis logic) stays the same.
+#
+# HA version requirement
+# ──────────────────────
+#   The trigger thresholds use variables (e.g. above: "{{ outlet_watts }}").
+#   This requires Home Assistant 2023.4 or newer.
+#   For older installations replace the template strings with literal
+#   numbers:  above: 20  /  below: 15
+
+- id: pv_smart_outlet_1_on
+  alias: "PV Smart Outlet 1 – Turn ON when surplus available"
+  description: >
+    Activates switch.smart_outlet_1 (~20 W) when the PV system is
+    exporting more power than the outlet's draw to the grid.
+  variables:
+    outlet_entity: switch.smart_outlet_1
+    outlet_watts: 20
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.pv_grid_return_power
+      above: "{{ outlet_watts }}"
+  condition:
+    - condition: state
+      entity_id: switch.smart_outlet_1
+      state: "off"
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.smart_outlet_1
+
+- id: pv_smart_outlet_1_off
+  alias: "PV Smart Outlet 1 – Turn OFF when surplus insufficient"
+  description: >
+    Deactivates switch.smart_outlet_1 when exported power drops below
+    the hysteresis threshold (75 % of outlet draw = 15 W).
+  variables:
+    outlet_entity: switch.smart_outlet_1
+    outlet_watts: 20
+    hysteresis_factor: 0.75
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.pv_grid_return_power
+      below: "{{ (outlet_watts * hysteresis_factor) | int }}"
+  condition:
+    - condition: state
+      entity_id: switch.smart_outlet_1
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.smart_outlet_1
