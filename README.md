@@ -280,11 +280,19 @@ Assign a battery type label to each sensor entity so the template can include it
 | Label | Displayed as |
 |---|---|
 | `battery_aa` | AA |
+| `battery_aa_2` | 2x AA |
+| `battery_aa_3` | 3x AA |
+| `battery_aa_4` | 4x AA |
 | `battery_aaa` | AAA |
+| `battery_aaa_2` | 2x AAA |
+| `battery_aaa_3` | 3x AAA |
+| `battery_aaa_4` | 4x AAA |
 | `battery_cr2032` | CR2032 |
 | `battery_cr2450` | CR2450 |
 | `battery_9v` | 9V |
 | `battery_d` | D |
+| `battery_d_2` | 2x D |
+| `battery_d_4` | 4x D |
 
 One-time setup per device: **Settings → Devices & Services** → open device → assign the matching label to its battery sensor entity. If no battery type label is set, the type is simply omitted from the output.
 
