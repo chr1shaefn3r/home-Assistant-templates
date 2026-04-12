@@ -1,0 +1,21 @@
+{% set temperature_threshold = temperature_threshold | default(21) %}
+{% set evening_start = evening_start | default(18) %}
+{% set today = now().date() | string %}
+{% set ns = namespace(found=false, cool_hour=-1) %}
+{% for slot in forecast %}
+{% if slot.datetime[:10] == today %}
+{% set hour = (slot.datetime | as_datetime).hour %}
+{% if hour >= evening_start %}
+{% if slot.temperature < temperature_threshold %}
+{% if not ns.found %}
+{% set ns.found = true %}
+{% set ns.cool_hour = hour %}
+{% endif %}
+{% else %}
+{% set ns.found = false %}
+{% set ns.cool_hour = -1 %}
+{% endif %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% if ns.found %}Ab {{ ns.cool_hour }} Uhr bleibt es unter {{ temperature_threshold }} Grad.{% endif %}

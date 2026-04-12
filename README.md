@@ -67,6 +67,7 @@ data:
 |---|---|
 | `daily_weather_summary.jinja` | Produces a German-language summary of today's weather condition and high temperature |
 | `daily_rain_summary.jinja` | Produces a German-language rain summary for the day based on an hourly forecast |
+| `evening_cooling.jinja` | Reports from which hour the outside temperature stays below a configurable threshold in the evening |
 
 **`daily_weather_summary.jinja`**
 
@@ -145,6 +146,48 @@ data:
   message: >
     {% set forecast = hourly_forecast['weather.forecast_home']['forecast'] %}
     {% include 'daily_rain_summary.jinja' %}
+```
+
+---
+
+**`evening_cooling.jinja`**
+
+Reports from which hour the outside temperature will stay below a configurable threshold in the evening. Useful for deciding when to open windows to cool a room. Renders nothing if the temperature never drops below the threshold that evening.
+
+**Input:** the `forecast` list from a `weather.get_forecasts` action call (hourly resolution).
+
+**Variables:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `temperature_threshold` | `21` | Temperature in °C below which the evening is considered cool enough |
+| `evening_start` | `18` | First hour of the evening window (24 h) |
+
+**Output examples:**
+
+| Scenario | Output |
+|---|---|
+| Temperature drops below 21 °C at 20:00 | `Ab 20 Uhr bleibt es unter 21 Grad.` |
+| Temperature dips below then rises, finally cool at 22:00 | `Ab 22 Uhr bleibt es unter 21 Grad.` |
+| Temperature never drops below threshold | *(empty — no output)* |
+
+**Home Assistant usage:**
+
+```yaml
+action: weather.get_forecasts
+target:
+  entity_id: weather.forecast_home
+data:
+  type: hourly
+response_variable: hourly_forecast
+
+action: notify.mobile_app
+data:
+  message: >
+    {% set forecast = hourly_forecast['weather.forecast_home']['forecast'] %}
+    {% set temperature_threshold = 21 %}
+    {% set evening_start = 18 %}
+    {% include 'evening_cooling.jinja' %}
 ```
 
 ---
@@ -387,6 +430,7 @@ The repository's `templates/` directory maps directly to `config/custom_template
 | `templates/greeting/greeting.jinja` | `custom_templates/greeting/greeting.jinja` |
 | `templates/weather/daily_weather_summary.jinja` | `custom_templates/weather/daily_weather_summary.jinja` |
 | `templates/weather/daily_rain_summary.jinja` | `custom_templates/weather/daily_rain_summary.jinja` |
+| `templates/weather/evening_cooling.jinja` | `custom_templates/weather/evening_cooling.jinja` |
 | `templates/family_calendar/daily_family_summary.jinja` | `custom_templates/family_calendar/daily_family_summary.jinja` |
 | `templates/battery_sensors/low_battery_summary.jinja` | `custom_templates/battery_sensors/low_battery_summary.jinja` |
 | `templates/greeting_day_summary.jinja` | `custom_templates/greeting_day_summary.jinja` |
@@ -543,6 +587,7 @@ All template tests live under `tests/`. Test files mirror the `templates/` direc
 templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
 templates/weather/daily_weather_summary.jinja        →  tests/weather/test_simple_daily.py
 templates/weather/daily_rain_summary.jinja           →  tests/weather/test_*rain*.py
+templates/weather/evening_cooling.jinja              →  tests/weather/test_evening_cooling.py
 templates/family_calendar/daily_family_summary.jinja →  tests/family_calendar/test_*.py
 templates/greeting_day_summary.jinja                 →  tests/test_greeting_day_summary.py
 ```
