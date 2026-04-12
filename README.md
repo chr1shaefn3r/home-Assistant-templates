@@ -320,8 +320,8 @@ The template computes `days_remaining = current_level / (capacity_used / days_si
 | All sensors above threshold | *(empty — no notification)* |
 | One sensor low, no labels | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%)` |
 | One sensor low, type labelled | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, CR2032)` |
-| One sensor low, with runtime estimate | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, ungefähr 8 Tage)` |
-| One sensor low, type + runtime | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, CR2032, ungefähr 8 Tage)` |
+| One sensor low, with runtime estimate | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (ungefähr 8 Tage)` |
+| One sensor low, type + runtime | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (ungefähr 8 Tage, CR2032)` |
 | Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (8%, AA), Türsensor (12%)` |
 | Low sensor is labelled `rechargeable` | *(excluded — no notification)* |
 
