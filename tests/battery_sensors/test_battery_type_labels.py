@@ -54,4 +54,17 @@ def test_sensor_above_threshold_type_label_irrelevant(render):
 def test_multi_battery_label(render):
     result = render(TEMPLATE, state_objects=[MOTION],
                     labels={"battery_aaa_2": ["sensor.motion_battery"]})
-    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, 2x AAA)"
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, zwei AAA Batterien)"
+
+
+def test_multi_battery_label_aa_4(render):
+    result = render(TEMPLATE, state_objects=[MOTION],
+                    labels={"battery_aa_4": ["sensor.motion_battery"]})
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, vier AA Batterien)"
+
+
+def test_d_battery_label_ignored(render):
+    """D-cell labels are no longer supported and treated as no label."""
+    result = render(TEMPLATE, state_objects=[MOTION],
+                    labels={"battery_d": ["sensor.motion_battery"]})
+    assert result == "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%)"
