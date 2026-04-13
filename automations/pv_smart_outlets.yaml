@@ -57,16 +57,21 @@
 - id: pv_smart_outlet_1_off
   alias: "PV Smart Outlet 1 – Turn OFF when surplus insufficient"
   description: >
-    Deactivates switch.smart_outlet_1 when exported power drops below
-    outlet_watts - hysteresis_watts (= 15 W).
+    Deactivates switch.smart_outlet_1 when exported power stays below
+    outlet_watts - hysteresis_watts (= 15 W) for at least min_on_minutes.
+    The 'for:' clause ensures the device has run for a minimum time before
+    being switched off again.
   variables:
     outlet_entity: switch.smart_outlet_1
     outlet_watts: 20
     hysteresis_watts: 5
+    min_on_minutes: 30
   trigger:
     - platform: numeric_state
       entity_id: sensor.pv_grid_return_power
       below: "{{ outlet_watts - hysteresis_watts }}"
+      for:
+        minutes: "{{ min_on_minutes }}"
   condition:
     - condition: state
       entity_id: switch.smart_outlet_1

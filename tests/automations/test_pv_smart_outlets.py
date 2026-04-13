@@ -71,10 +71,11 @@ def test_no_turn_on_at_new_on_threshold_exactly(pv_sim: AutomationSimulator):
 # ── OFF trigger: downward crossings ───────────────────────────────────────────
 
 def test_turn_off_when_surplus_crosses_below_hysteresis(pv_sim: AutomationSimulator):
-    """Outlet on, sensor at 20 W → drops to 10 W: crosses below 15 W → turn_off fires."""
+    """Outlet on, sensor at 20 W → drops to 10 W and stays there for 30 min → turn_off fires."""
     pv_sim.set_state("switch.smart_outlet_1", "on")
     pv_sim.set_state("sensor.pv_grid_return_power", "20")
-    pv_sim.update_state("sensor.pv_grid_return_power", "10")
+    pv_sim.update_state("sensor.pv_grid_return_power", "10")  # starts 30-min timer
+    pv_sim.advance_time(30)
     assert pv_sim.service_calls == [
         ServiceCall("switch.turn_off", ["switch.smart_outlet_1"])
     ]
@@ -137,16 +138,18 @@ def test_no_action_while_outlet_off_sensor_stays_below_on_threshold(pv_sim: Auto
 
 def test_full_on_off_cycle(pv_sim: AutomationSimulator):
     """
-    Complete lifecycle: surplus rises, outlet turns on; surplus drops, outlet turns off.
+    Complete lifecycle: surplus rises, outlet turns on; surplus drops and stays low, outlet turns off.
 
     State sequence:
-      0 W  → 30 W : crosses above 25 W → turn_on
-      30 W → 8 W  : crosses below 15 W → turn_off
+      0 W  → 30 W : crosses above 25 W → turn_on (immediate)
+      30 W → 8 W  : crosses below 15 W → starts 30-min timer
+      +30 min      : timer fires → turn_off
     """
     pv_sim.update_state("sensor.pv_grid_return_power", "30")
     assert pv_sim.get_state("switch.smart_outlet_1") == "on"
 
-    pv_sim.update_state("sensor.pv_grid_return_power", "8")
+    pv_sim.update_state("sensor.pv_grid_return_power", "8")   # starts timer
+    pv_sim.advance_time(30)                                    # timer fires
     assert pv_sim.get_state("switch.smart_outlet_1") == "off"
 
     assert len(pv_sim.service_calls) == 2
@@ -159,10 +162,12 @@ def test_repeated_on_off_cycles(pv_sim: AutomationSimulator):
     Outlet toggles ON then OFF twice — verifies state guards keep firing correctly
     across multiple full cycles without getting stuck.
     """
-    pv_sim.update_state("sensor.pv_grid_return_power", "30")  # turn on
-    pv_sim.update_state("sensor.pv_grid_return_power", "8")   # turn off
-    pv_sim.update_state("sensor.pv_grid_return_power", "26")  # turn on again
-    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # turn off again
+    pv_sim.update_state("sensor.pv_grid_return_power", "30")  # turn on (immediate)
+    pv_sim.update_state("sensor.pv_grid_return_power", "8")   # start off-timer
+    pv_sim.advance_time(30)                                    # off-timer fires
+    pv_sim.update_state("sensor.pv_grid_return_power", "26")  # turn on again (immediate)
+    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # start off-timer again
+    pv_sim.advance_time(30)                                    # off-timer fires again
 
     assert len(pv_sim.service_calls) == 4
     assert [c.service for c in pv_sim.service_calls] == [
@@ -170,6 +175,54 @@ def test_repeated_on_off_cycles(pv_sim: AutomationSimulator):
         "switch.turn_off",
         "switch.turn_on",
         "switch.turn_off",
+    ]
+
+
+# ── Minimum run-time (new requirement) ───────────────────────────────────────
+
+def test_outlet_not_turned_off_before_min_run_time(pv_sim: AutomationSimulator):
+    """Surplus drops below the OFF threshold — outlet must stay on until min_on_minutes elapses."""
+    pv_sim.set_state("switch.smart_outlet_1", "on")
+    pv_sim.set_state("sensor.pv_grid_return_power", "30")
+    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # crosses below 15 W
+    assert pv_sim.service_calls == []                          # must NOT fire immediately
+
+
+def test_outlet_turns_off_after_min_run_time_elapses(pv_sim: AutomationSimulator):
+    """Surplus stays below threshold for 30+ min → turn_off fires."""
+    pv_sim.set_state("switch.smart_outlet_1", "on")
+    pv_sim.set_state("sensor.pv_grid_return_power", "30")
+    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # crosses below 15 W
+    pv_sim.advance_time(30)                                    # 30 minutes elapse
+    assert pv_sim.service_calls == [
+        ServiceCall("switch.turn_off", ["switch.smart_outlet_1"])
+    ]
+
+
+def test_min_run_time_timer_resets_if_surplus_recovers(pv_sim: AutomationSimulator):
+    """
+    Surplus drops, recovers before 30 min, then drops again — clock restarts on each new crossing.
+
+    Timeline:
+      t=0   surplus drops to 5 W  → timer starts
+      t=15  surplus recovers to 20 W → timer cancelled
+      t=30  (only 15 min since last drop) — no turn_off
+      t=30  surplus drops to 5 W again → new timer starts
+      t=60  30 min after second drop → turn_off fires
+    """
+    pv_sim.set_state("switch.smart_outlet_1", "on")
+    pv_sim.set_state("sensor.pv_grid_return_power", "30")
+
+    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # t=0  timer starts
+    pv_sim.advance_time(15)                                    # t=15 — not yet
+    pv_sim.update_state("sensor.pv_grid_return_power", "20")  # t=15 surplus recovers → cancel
+    pv_sim.advance_time(15)                                    # t=30 — still no fire (timer was reset)
+    assert pv_sim.service_calls == []
+
+    pv_sim.update_state("sensor.pv_grid_return_power", "5")   # t=30 new crossing → new timer
+    pv_sim.advance_time(30)                                    # t=60 — 30 min since second drop
+    assert pv_sim.service_calls == [
+        ServiceCall("switch.turn_off", ["switch.smart_outlet_1"])
     ]
 
 
@@ -182,10 +235,11 @@ def test_no_action_when_sensor_state_is_unavailable(pv_sim: AutomationSimulator)
 
 
 def test_turn_off_when_sensor_drops_to_zero(pv_sim: AutomationSimulator):
-    """Sensor was at 30 W (outlet on), drops to 0 W → crosses below 15 W → turn_off fires."""
+    """Sensor was at 30 W (outlet on), drops to 0 W and stays there for 30 min → turn_off fires."""
     pv_sim.set_state("switch.smart_outlet_1", "on")
     pv_sim.set_state("sensor.pv_grid_return_power", "30")
-    pv_sim.update_state("sensor.pv_grid_return_power", "0")
+    pv_sim.update_state("sensor.pv_grid_return_power", "0")   # starts timer
+    pv_sim.advance_time(30)
     assert pv_sim.service_calls == [
         ServiceCall("switch.turn_off", ["switch.smart_outlet_1"])
     ]
@@ -194,11 +248,12 @@ def test_turn_off_when_sensor_drops_to_zero(pv_sim: AutomationSimulator):
 def test_turn_off_on_negative_surplus(pv_sim: AutomationSimulator):
     """
     Negative values mean the house is importing power (night / heavy load).
-    They cross below 15 W → turn_off fires.
+    They cross below 15 W and after 30 min → turn_off fires.
     """
     pv_sim.set_state("switch.smart_outlet_1", "on")
     pv_sim.set_state("sensor.pv_grid_return_power", "20")
-    pv_sim.update_state("sensor.pv_grid_return_power", "-50")
+    pv_sim.update_state("sensor.pv_grid_return_power", "-50")  # starts timer
+    pv_sim.advance_time(30)
     assert pv_sim.service_calls == [
         ServiceCall("switch.turn_off", ["switch.smart_outlet_1"])
     ]

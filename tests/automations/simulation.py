@@ -11,6 +11,10 @@ Triggers:
       entity_id: <str>
       above: <number | "{{ expr }}">   # fires on upward crossing
       below: <number | "{{ expr }}">   # fires on downward crossing
+      for:                             # optional: condition must hold for this duration
+        minutes: <number | "{{ expr }}">
+        hours:   <number | "{{ expr }}">   # optional
+        seconds: <number | "{{ expr }}">   # optional
 
 Conditions (all must pass; empty list = always passes):
   - condition: state
@@ -25,6 +29,14 @@ Actions (executed in order):
 State side-effects:
   switch.turn_on  → entity state set to "on"
   switch.turn_off → entity state set to "off"
+
+Time simulation
+───────────────
+Triggers with a 'for:' clause are held in a pending queue.  Use
+advance_time(minutes) to move the simulator clock forward; any pending
+trigger whose 'for:' duration has elapsed will fire at that point.  If
+the watched entity's value returns to the non-trigger side before the
+duration elapses, the pending trigger is automatically cancelled.
 """
 from __future__ import annotations
 
@@ -43,6 +55,15 @@ class ServiceCall:
     entity_ids: list[str]   # target entities (always a list)
 
 
+@dataclass
+class _PendingTrigger:
+    """A trigger with a 'for:' clause that has not yet elapsed."""
+    automation: dict
+    trigger: dict
+    for_minutes: float
+    activated_at: float     # simulator clock value (minutes) when the crossing was detected
+
+
 class AutomationSimulator:
     """
     Simulates the trigger → condition → action pipeline of HA automations.
@@ -52,8 +73,16 @@ class AutomationSimulator:
     sim = AutomationSimulator("automations/pv_smart_outlets.yaml")
     sim.set_state("sensor.pv_grid_return_power", "0")
     sim.set_state("switch.smart_outlet_1", "off")
-    sim.update_state("sensor.pv_grid_return_power", "25")
+
+    # Immediate trigger (no 'for:')
+    sim.update_state("sensor.pv_grid_return_power", "30")
     assert sim.service_calls == [ServiceCall("switch.turn_on", ["switch.smart_outlet_1"])]
+
+    # Deferred trigger (with 'for:')
+    sim.update_state("sensor.pv_grid_return_power", "5")   # starts 30-min timer
+    assert sim.service_calls == [...]                       # turn_on only, not yet off
+    sim.advance_time(30)                                    # clock advances 30 minutes
+    assert sim.service_calls[-1] == ServiceCall("switch.turn_off", [...])
     """
 
     def __init__(self, yaml_path: str | Path) -> None:
@@ -62,6 +91,8 @@ class AutomationSimulator:
         )
         self._states: dict[str, str] = {}
         self.service_calls: list[ServiceCall] = []
+        self._time_minutes: float = 0.0
+        self._pending: list[_PendingTrigger] = []
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -77,11 +108,16 @@ class AutomationSimulator:
         """
         Update state and evaluate all automations whose trigger watches this entity.
 
-        Automations are evaluated in YAML document order. Multiple automations
-        may fire from a single update. Each automation fires at most once.
+        Triggers without 'for:' fire immediately on a crossing.
+        Triggers with 'for:' are queued; call advance_time() to mature them.
+        A pending trigger is cancelled if the entity's value returns to the
+        non-trigger side before the duration elapses.
         """
         old_state = self._states.get(entity_id, "unknown")
         self._states[entity_id] = new_state
+
+        # Cancel any pending triggers whose level condition is no longer met
+        self._cancel_stale_pending(entity_id, new_state)
 
         for automation in self._automations:
             triggers = automation.get("trigger", [])
@@ -89,14 +125,74 @@ class AutomationSimulator:
                 triggers = [triggers]
 
             for trigger in triggers:
-                if self._trigger_fires(trigger, entity_id, old_state, new_state, automation):
+                if not self._trigger_fires(trigger, entity_id, old_state, new_state, automation):
+                    continue
+
+                for_raw = trigger.get("for")
+                if for_raw is not None:
+                    variables = automation.get("variables", {})
+                    for_minutes = self._resolve_for_minutes(for_raw, variables)
+                    # Reset any existing pending timer for this automation (new crossing wins)
+                    self._pending = [p for p in self._pending if p.automation is not automation]
+                    self._pending.append(_PendingTrigger(
+                        automation=automation,
+                        trigger=trigger,
+                        for_minutes=for_minutes,
+                        activated_at=self._time_minutes,
+                    ))
+                else:
                     if self._conditions_pass(automation.get("condition", [])):
                         self._execute_actions(automation.get("action", []))
-                    break  # each automation fires at most once per update
+                break  # each automation fires at most once per update
+
+    def advance_time(self, minutes: float) -> None:
+        """
+        Advance the simulator clock by the given number of minutes.
+
+        Any pending 'for:' trigger whose duration has now elapsed is evaluated:
+        its conditions are checked and, if they pass, its actions are executed.
+        """
+        self._time_minutes += minutes
+        matured = [
+            p for p in self._pending
+            if self._time_minutes - p.activated_at >= p.for_minutes
+        ]
+        self._pending = [
+            p for p in self._pending
+            if self._time_minutes - p.activated_at < p.for_minutes
+        ]
+        for p in matured:
+            if self._conditions_pass(p.automation.get("condition", [])):
+                self._execute_actions(p.automation.get("action", []))
 
     def clear_service_calls(self) -> None:
         """Reset the recorded call list between test phases."""
         self.service_calls = []
+
+    # ── Private: pending trigger management ──────────────────────────────────
+
+    def _cancel_stale_pending(self, entity_id: str, new_state: str) -> None:
+        """Remove pending triggers whose level condition is no longer satisfied."""
+        try:
+            val = float(new_state)
+        except (ValueError, TypeError):
+            return  # non-numeric state: leave pending triggers as-is
+
+        remaining = []
+        for pt in self._pending:
+            if pt.trigger.get("entity_id") != entity_id:
+                remaining.append(pt)
+                continue
+            variables = pt.automation.get("variables", {})
+            below_raw = pt.trigger.get("below")
+            above_raw = pt.trigger.get("above")
+            # Cancel if the value has crossed back to the non-trigger side
+            if below_raw is not None and val >= self._resolve_numeric(below_raw, variables):
+                continue  # cancelled
+            if above_raw is not None and val <= self._resolve_numeric(above_raw, variables):
+                continue  # cancelled
+            remaining.append(pt)
+        self._pending = remaining
 
     # ── Private: trigger evaluation ───────────────────────────────────────────
 
@@ -145,6 +241,7 @@ class AutomationSimulator:
         Supported template forms:
           "{{ outlet_watts }}"
           "{{ (outlet_watts * hysteresis_factor) | int }}"
+          "{{ outlet_watts + hysteresis_watts }}"
 
         The expression is validated against a strict whitelist (digits,
         whitespace, arithmetic operators) before eval to prevent injection.
@@ -167,6 +264,27 @@ class AutomationSimulator:
             if re.fullmatch(r'[\d\s.\+\-\*\/\(\)]+', inner):
                 return float(eval(inner))  # noqa: S307 — input validated by regex above
         raise ValueError(f"Cannot resolve threshold: {value!r}")
+
+    def _resolve_for_minutes(self, for_val: Any, variables: dict[str, Any]) -> float:
+        """
+        Return the 'for:' duration in minutes.
+
+        Accepts:
+          for: {minutes: 30}
+          for: {minutes: "{{ min_on_minutes }}"}
+          for: {hours: 1, minutes: 30}
+          for: "01:30:00"   (HH:MM:SS string)
+        """
+        if isinstance(for_val, dict):
+            hours   = self._resolve_numeric(for_val.get("hours",   0), variables)
+            minutes = self._resolve_numeric(for_val.get("minutes", 0), variables)
+            seconds = self._resolve_numeric(for_val.get("seconds", 0), variables)
+            return hours * 60.0 + minutes + seconds / 60.0
+        if isinstance(for_val, str):
+            parts = for_val.strip().split(":")
+            if len(parts) == 3:
+                return int(parts[0]) * 60 + int(parts[1]) + int(parts[2]) / 60
+        raise ValueError(f"Cannot resolve 'for:' duration: {for_val!r}")
 
     # ── Private: condition evaluation ─────────────────────────────────────────
 
