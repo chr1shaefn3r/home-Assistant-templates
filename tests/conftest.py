@@ -1,7 +1,7 @@
 """Shared fixtures: a Jinja2 environment that mimics Home Assistant's template engine."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 import jinja2
@@ -48,6 +48,7 @@ def make_environment(
     now: datetime | None = None,
     state_objects: list[_State] | None = None,
     labels: dict[str, list[str]] | None = None,
+    local_tz: tzinfo | None = None,
 ) -> jinja2.Environment:
     """Return a Jinja2 env with HA globals and filters stubbed out."""
     _states = states or {}
@@ -84,6 +85,15 @@ def make_environment(
 
     env.globals["as_datetime"] = _as_datetime
     env.filters["as_datetime"] = _as_datetime
+
+    def _as_local(dt: datetime) -> datetime:
+        """Mirror HA's as_local: convert aware dt to local_tz; return naive dt unchanged."""
+        if local_tz is not None and dt.tzinfo is not None:
+            return dt.astimezone(local_tz)
+        return dt
+
+    env.globals["as_local"] = _as_local
+    env.filters["as_local"] = _as_local
     _labels = labels or {}
     env.globals["label_entities"] = lambda label: _labels.get(label, [])
 
@@ -115,6 +125,7 @@ def render():
         variables: dict | None = None,
         state_objects: list[_State] | None = None,
         labels: dict[str, list[str]] | None = None,
+        local_tz: tzinfo | None = None,
     ) -> str:
         env = make_environment(
             states=states,
@@ -122,6 +133,7 @@ def render():
             now=now,
             state_objects=state_objects,
             labels=labels,
+            local_tz=local_tz,
         )
         tmpl = env.get_template(template_path)
         return tmpl.render(**(variables or {})).strip()

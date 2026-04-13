@@ -3,7 +3,7 @@
 {% set today = now().date() | string %}
 {% set ns = namespace(found=false, cool_hour=-1) %}
 {% for slot in forecast %}
-{% set slot_dt = slot.datetime | as_datetime %}
+{% set slot_dt = slot.datetime | as_datetime | as_local %}
 {% if slot_dt.date() | string == today %}
 {% set hour = slot_dt.hour %}
 {% if hour >= evening_start %}

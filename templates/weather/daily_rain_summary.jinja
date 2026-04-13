@@ -1,15 +1,15 @@
 {% set today = now().date() | string %}
 {% set today_forecast = namespace(slots=[]) %}
 {% for slot in forecast %}
-{% if (slot.datetime | as_datetime).date() | string == today %}{% set today_forecast.slots = today_forecast.slots + [slot] %}{% endif %}
+{% if (slot.datetime | as_datetime | as_local).date() | string == today %}{% set today_forecast.slots = today_forecast.slots + [slot] %}{% endif %}
 {% endfor %}
 {% set rainy = today_forecast.slots | selectattr('precipitation', 'gt', 0) | list %}
 {% if rainy | length == 0 %}Heute bleibt es trocken
 {% else %}
 {% set ns = namespace(groups=[], current=[rainy[0]]) %}
 {% for slot in rainy[1:] %}
-{% set prev_hour = (ns.current[-1].datetime | as_datetime).hour %}
-{% set curr_hour = (slot.datetime | as_datetime).hour %}
+{% set prev_hour = (ns.current[-1].datetime | as_datetime | as_local).hour %}
+{% set curr_hour = (slot.datetime | as_datetime | as_local).hour %}
 {% if curr_hour == prev_hour + 1 %}
 {% set ns.current = ns.current + [slot] %}
 {% else %}
@@ -22,8 +22,8 @@
 {% else %}
 {% set ns2 = namespace(parts=[]) %}
 {% for group in ns.groups %}
-{% set start = (group[0].datetime | as_datetime).hour %}
-{% set end = (group[-1].datetime | as_datetime).hour + 1 %}
+{% set start = (group[0].datetime | as_datetime | as_local).hour %}
+{% set end = (group[-1].datetime | as_datetime | as_local).hour + 1 %}
 {% set ns2.parts = ns2.parts + ["von " ~ start ~ " bis " ~ end ~ " Uhr"] %}
 {% endfor %}
 Heute regnet es {{ ns2.parts | join(" und ") }}

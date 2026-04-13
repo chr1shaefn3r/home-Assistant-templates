@@ -174,6 +174,8 @@ Reports from which hour the outside temperature will stay below a configurable t
 | Temperature dips below then rises, finally cool at 22:00 | `Ab 22 Uhr bleibt es unter 21 Grad.` |
 | Temperature never drops below threshold | *(empty — no output)* |
 
+**Timezone handling:** forecast `datetime` values are piped through HA's `as_local` filter before the date and hour are extracted. This means all comparisons happen in your configured local timezone, not UTC. Without this, UTC forecast entries late in the evening (e.g. 22:00–23:00 UTC in a UTC+2 timezone) would be treated as "today" even though they represent midnight or 01:00 the next local day — and if those entries happened to be warm, they would incorrectly clear the result and produce empty output.
+
 **Home Assistant usage:**
 
 ```yaml
@@ -642,7 +644,7 @@ pytest -v
 
 Tests are split into two layers that mirror the repo structure:
 
-**Template tests** (`tests/`) — use the `render()` fixture from `tests/conftest.py`, which sets up a Jinja2 environment with all HA globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `float`, `int`, …):
+**Template tests** (`tests/`) — use the `render()` fixture from `tests/conftest.py`, which sets up a Jinja2 environment with all HA globals and filters stubbed out (`states`, `is_state`, `state_attr`, `now`, `as_datetime`, `as_local`, `float`, `int`, …):
 
 ```
 templates/greeting/greeting.jinja                    →  tests/greeting/test_*.py
@@ -661,6 +663,25 @@ def test_example(render):
     )
     assert "Heute bleibt es trocken" in result
 ```
+
+**`local_tz` parameter:** pass a `datetime.timezone` (or any `tzinfo`) to simulate a non-UTC local timezone. When set, the `as_local` stub converts timezone-aware forecast datetimes into that timezone before date/hour extraction — matching what HA does at runtime:
+
+```python
+from datetime import timezone, timedelta
+
+CEST = timezone(timedelta(hours=2))
+
+def test_late_evening_no_reset(render):
+    result = render(
+        "weather/evening_cooling.jinja",
+        now=datetime(2026, 4, 12, 22, 25, 0),
+        variables={"forecast": [...]},
+        local_tz=CEST,
+    )
+    assert result == "Ab 21 Uhr bleibt es unter 21 Grad."
+```
+
+When `local_tz` is omitted, `as_local` is a no-op (datetimes are returned unchanged), which matches the default behaviour of HA instances running in UTC.
 
 **Automation tests** (`tests/automations/`) — use `AutomationSimulator` from `tests/automations/simulation.py`, which parses the YAML automation file and simulates the trigger → condition → action pipeline in pure Python (no HA installation required):
 
