@@ -1,0 +1,149 @@
+- id: solar_priority_manager
+  alias: "Solar – Priority Plug Manager"
+
+  # ─────────────────────────────────────────────────────────────────
+  # TRIGGERS
+  # Re-evaluate whenever export power crosses a meaningful threshold,
+  # or as a periodic safety net in case a trigger was missed.
+  # The `for` debounce prevents reaction to brief clouds/spikes.
+  # ─────────────────────────────────────────────────────────────────
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.verteilerkasten_treppe_netz_einspeisung_power
+      above: 50
+      for: {seconds: 30}
+    - platform: numeric_state
+      entity_id: sensor.verteilerkasten_treppe_netz_einspeisung_power
+      below: 50
+      for: {seconds: 30}
+    - platform: time_pattern
+      minutes: "/5"       # safety net: re-evaluate every 5 min regardless
+
+  action:
+    - variables:
+
+        # ╔═══════════════════════════════════════════════════════════╗
+        # ║  DEVICE PRIORITY LIST – the only place you ever need      ║
+        # ║  to add, remove, or reorder managed devices.              ║
+        # ║                                                           ║
+        # ║  Order        = priority (first = highest).               ║
+        # ║  watts        = worst-case draw, used for turn-on         ║
+        # ║                 threshold decision.                       ║
+        # ║  power_sensor = actual measured draw (optional), used     ║
+        # ║                 for budget recovery. Falls back to watts  ║
+        # ║                 if omitted. Useful when a device draws    ║
+        # ║                 less than rated (e.g. a battery charger   ║
+        # ║                 that tapers off once batteries are full). ║
+        # ║                                                           ║
+        # ║  Expressed as a Jinja2 template (not a YAML list) to      ║
+        # ║  avoid HA schema validation errors.                       ║
+        # ╚═══════════════════════════════════════════════════════════╝
+        devices: >
+          {{ [
+            {'entity': 'switch.tasmota_a793de_keller_ladegerat',     'watts': 100, 'power_sensor': 'sensor.tasmota_a793de_keller_ladegerat_energy_power'},
+            {'entity': 'switch.tasmota_a7ef49_keller_ladegerat_12v', 'watts': 60,  'power_sensor': 'sensor.tasmota_a7ef49_keller_ladegerat_12v_energy_power'}
+          ] }}
+
+        # ─────────────────────────────────────────────────────────
+        # THE BUDGET TRICK: reconstruct true solar output
+        #
+        # The export sensor only shows what is currently flowing
+        # back to the grid. If managed devices are already running,
+        # they are consuming solar that does not appear as export.
+        #
+        # Example:
+        #   Solar produces       200 W
+        #   18V charger running  - 5 W   (nearly full, not visible as export)
+        #   Export sensor reads  = 195 W ← what HA sees
+        #
+        # Fix: add back the ACTUAL measured draw of every managed
+        # device that is currently ON (not the rated watts) to recover
+        # the true solar production figure.
+        #
+        #   export (195) + charger actual draw (5) = budget 200 W ✓
+        #
+        # Using rated watts here instead would overestimate the budget
+        # (195 + 100 = 295 W) and could cause prio2 to turn on even
+        # though there is not actually enough solar, pulling from grid.
+        # ─────────────────────────────────────────────────────────
+        total_available: >
+          {% set export = states('sensor.verteilerkasten_treppe_netz_einspeisung_power') | float(0) %}
+          {% set ns = namespace(on_watts=0) %}
+          {% for d in devices %}
+            {% if is_state(d.entity, 'on') %}
+              {% if d.power_sensor is defined %}
+                {# Use actual measured draw – handles tapering devices like battery chargers #}
+                {% set ns.on_watts = ns.on_watts + states(d.power_sensor) | float(d.watts) %}
+              {% else %}
+                {# No power sensor available – fall back to rated watts #}
+                {% set ns.on_watts = ns.on_watts + d.watts %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ export + ns.on_watts }}
+
+        # ─────────────────────────────────────────────────────────
+        # BUILD THE EXECUTION PLAN
+        #
+        # Walk the priority list from top to bottom. For each device,
+        # check whether the remaining budget covers it. If yes,
+        # schedule it ON and deduct its watts. If no, schedule it OFF
+        # and skip all lower-priority devices (the budget cannot
+        # recover further down the list).
+        #
+        # HYSTERESIS: to avoid rapid on/off toggling when solar
+        # hovers near a device's threshold, we demand an extra 20%
+        # headroom before turning a device ON. No extra headroom is
+        # required to keep it on once already running.
+        #
+        #   Device currently OFF → must have (watts * 1.2) budget
+        #   Device currently ON  → needs only  watts budget to stay on
+        #
+        # Examples:
+        #   18V charger (100W): needs 120W to turn on, 100W to stay on
+        #   12V charger  (60W): needs  72W to turn on,  60W to stay on
+        #
+        # The plan is a list of {entity, state} dicts, e.g.:
+        #   [{entity: switch.tasmota_a793de_keller_ladegerat,     state: on},
+        #    {entity: switch.tasmota_a7ef49_keller_ladegerat_12v, state: off}]
+        # ─────────────────────────────────────────────────────────
+        plan: >
+          {% set ns = namespace(budget=total_available | float(0), result=[]) %}
+          {% for d in devices %}
+            {% set already_on = is_state(d.entity, 'on') %}
+            {% set threshold = d.watts + (0 if already_on else d.watts * 0.2) %}
+            {% if ns.budget >= threshold %}
+              {% set ns.result = ns.result + [{'entity': d.entity, 'state': 'on'}] %}
+              {% set ns.budget = ns.budget - d.watts %}
+            {% else %}
+              {% set ns.result = ns.result + [{'entity': d.entity, 'state': 'off'}] %}
+              {# Once a device cannot be funded, all lower-priority  #}
+              {# devices are also cut – no need to check them.       #}
+            {% endif %}
+          {% endfor %}
+          {{ ns.result }}
+
+    # ─────────────────────────────────────────────────────────────
+    # APPLY PLAN – turn OFFs first, then ONs
+    #
+    # Turning off first ensures we do not momentarily over-draw from
+    # the grid before the lower-priority devices have been shed.
+    # Calling turn_off on an already-off switch (and vice versa) is
+    # a no-op in HA, so no guard conditions are needed.
+    # ─────────────────────────────────────────────────────────────
+
+    # Step 1 – shed devices that are no longer affordable
+    - repeat:
+        for_each: "{{ plan | selectattr('state', 'eq', 'off') | list }}"
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: "{{ repeat.item.entity }}"
+
+    # Step 2 – energise devices that now fit within the budget
+    - repeat:
+        for_each: "{{ plan | selectattr('state', 'eq', 'on') | list }}"
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: "{{ repeat.item.entity }}"
