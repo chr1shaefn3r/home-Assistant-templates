@@ -443,18 +443,43 @@ Takes a voice transcript posted by the Pebble Index O1 to a webhook, hands it to
 
 **Request format:**
 
+The Index O1 posts `multipart/form-data` with the recognised text in a part named `transcription`:
+
 ```
 POST https://<your-ha-url>/api/webhook/<webhook_id>
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=<uuid>
 
-{"transcript": "schalte das Licht im Wohnzimmer ein"}
+--<uuid>
+Content-Disposition: form-data; name="transcription"
+
+schalte das Licht im Wohnzimmer ein
+--<uuid>--
 ```
+
+Home Assistant parses the body as JSON only when the `Content-Type` contains "json"; every other body — multipart and urlencoded alike — is parsed as a form and exposed as `trigger.data`. The automation reads `transcription` from there first.
+
+**Accepted sources**, in the order they are checked:
+
+| Source | Field |
+|---|---|
+| `trigger.data` — `multipart/form-data`, `application/x-www-form-urlencoded` | `transcription` |
+| `trigger.json` — `application/json` | `transcription`, then `transcript` |
+| `trigger.query` — URL query string | `transcription` |
+
+The JSON and query forms are fallbacks so you can test the webhook by hand:
+
+```bash
+curl -F 'transcription=schalte das Licht im Wohnzimmer ein' \
+  https://<your-ha-url>/api/webhook/<webhook_id>
+```
+
+This expects `transcription` to be an ordinary text field. A part sent with a filename arrives as a file upload object rather than a string and would need decoding instead.
 
 **Flow:**
 
 | Step | Outcome |
 |---|---|
-| `transcript` missing or empty | Error notification, automation stops |
+| `transcription` missing or empty | Error notification, automation stops |
 | `conversation.process` returns `action_done` / `query_answer` | Success notification with the agent's spoken reply (or `Erledigt: <transcript>` when the intent has no reply) |
 | `conversation.process` returns `error`, or the call itself fails | Error notification with the agent's message and the error code (e.g. `no_intent_match`) |
 

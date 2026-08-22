@@ -17,9 +17,13 @@
   # The webhook is reachable at:
   #   https://<your-ha-url>/api/webhook/<webhook_id>
   #
-  # Expected request:
-  #   POST, Content-Type: application/json
-  #   {"transcript": "schalte das Licht im Wohnzimmer ein"}
+  # Expected request (what the Index O1 sends):
+  #   POST, Content-Type: multipart/form-data; boundary=<uuid>
+  #   a part named `transcription` holding the recognised text
+  #
+  # A JSON body with a `transcription` (or `transcript`) field and a
+  # `?transcription=…` query parameter are accepted as well – handy for
+  # testing the webhook by hand.
   #
   # The webhook ID *is* the credential – anyone who knows the URL can talk
   # to the assistant. Replace the placeholder below with a long random
@@ -47,12 +51,34 @@
     # another agent entity to route the transcript elsewhere.
     assistant_agent: conversation.home_assistant
 
-    # ── Extract the transcript from the JSON body ──────────────────
-    # `trigger.json` only exists when the request carried a JSON body and a
-    # matching Content-Type header. Defaulting to an empty dict keeps the
-    # template from erroring on form-encoded or empty requests – the guard
-    # below turns that into a proper error notification instead.
-    transcript: "{{ (trigger.json | default({}, true)).get('transcript', '') | string | trim }}"
+    # ── Extract the transcript from the request ────────────────────
+    # The Index O1 posts multipart/form-data with the text in a field named
+    # `transcription`. HA only parses the body as JSON when the Content-Type
+    # contains "json"; everything else – multipart and urlencoded alike – is
+    # parsed as a form and exposed as `trigger.data`, so that is checked first.
+    #
+    #   trigger.data   multipart/form-data, application/x-www-form-urlencoded
+    #   trigger.json   application/json
+    #   trigger.query  ?transcription=… in the URL
+    #
+    # The JSON and query lookups are fallbacks, so a manual test with curl or
+    # the HA REST API works without reshaping the request. Each source is
+    # defaulted to an empty dict: an absent one is Undefined, not an error,
+    # and an empty result is turned into an error notification by the guard
+    # below.
+    #
+    # Note: this expects `transcription` to be an ordinary text field. A part
+    # sent with a filename would arrive as a file upload object rather than a
+    # string, and would need decoding instead.
+    transcript: >
+      {% set form  = trigger.data  | default({}, true) %}
+      {% set body  = trigger.json  | default({}, true) %}
+      {% set query = trigger.query | default({}, true) %}
+      {{ (form.get('transcription')
+          or body.get('transcription')
+          or body.get('transcript')
+          or query.get('transcription')
+          or '') | string | trim }}
 
   action:
     # ─────────────────────────────────────────────────────────────
@@ -68,8 +94,8 @@
           data:
             title: "Assistent – Fehler"
             message: >
-              Webhook ohne Transkript empfangen. Erwartet wird ein JSON-Body
-              mit dem Feld "transcript".
+              Webhook ohne Transkript empfangen. Erwartet wird ein
+              multipart/form-data-Feld namens "transcription".
             data:
               tag: pebble-index-o1-assistant-error
         - stop: "No transcript in webhook payload"
