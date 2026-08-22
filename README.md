@@ -14,6 +14,7 @@ A collection of Jinja2 templates and YAML automations for [Home Assistant](https
   - [Battery-powered Sensors](#battery-powered-sensors-templatesbattery_sensors)
 - [Automations](#automations)
   - [PV Smart Outlets](#pv-smart-outlets-automationspv_smart_outletsyaml)
+  - [Pebble Index O1 Assistant](#pebble-index-o1-assistant-automationspebble_index_o1_assistantyaml)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
   - [Precondition: File Editor app](#precondition-file-editor-app)
   - [Setting up the custom_templates directory](#setting-up-the-custom_templates-directory)
@@ -438,6 +439,45 @@ Duplicate both automation blocks in `pv_smart_outlets.yaml` and change only thes
 Everything else (trigger entity, hysteresis calculation) stays unchanged.
 
 > **HA version note:** Trigger thresholds use automation variables (`above: "{{ outlet_watts }}"`), which requires Home Assistant 2023.4 or newer. For older installations replace the template strings with literal numbers: `above: 20` / `below: 15`.
+
+---
+
+### Pebble Index O1 Assistant (`automations/pebble_index_o1_assistant.yaml`)
+
+Takes a voice transcript posted by the Pebble Index O1 to a webhook, hands it to the Home Assistant default conversation agent, and pushes the outcome back to the phone via the Companion app.
+
+**Request format:**
+
+```
+POST https://<your-ha-url>/api/webhook/<webhook_id>
+Content-Type: application/json
+
+{"transcript": "schalte das Licht im Wohnzimmer ein"}
+```
+
+**Flow:**
+
+| Step | Outcome |
+|---|---|
+| `transcript` missing or empty | Error notification, automation stops |
+| `conversation.process` returns `action_done` / `query_answer` | Success notification with the agent's spoken reply (or `Erledigt: <transcript>` when the intent has no reply) |
+| `conversation.process` returns `error`, or the call itself fails | Error notification with the agent's message and the error code (e.g. `no_intent_match`) |
+
+Success and error notifications use different `tag` values, so a new answer replaces the previous answer on the phone instead of stacking up, while errors stay visible separately.
+
+**Settings to adjust:**
+
+| Field | Description |
+|---|---|
+| `trigger.webhook_id` | Replace the placeholder with a long random string (`openssl rand -hex 24`). The webhook ID is the only credential protecting the endpoint — anyone who knows the URL can talk to your assistant, so do not commit the real value. |
+| `variables.notify_service` | Your phone's notify service, e.g. `notify.mobile_app_pixel_8`. Look it up under **Developer Tools → Actions**. |
+| `variables.assistant_agent` | `conversation.home_assistant` is the built-in default agent. Point it at another agent entity to route the transcript elsewhere. |
+
+`local_only: false` is set because the watch posts from outside the local network. Set it to `true` if the webhook is only ever called from your LAN or through a VPN.
+
+The notification texts are German, matching the templates in this repository — change the `title` and `message` strings if you want a different language.
+
+> **HA version note:** `allowed_methods` and `local_only` on webhook triggers require Home Assistant 2023.7 or newer.
 
 ---
 

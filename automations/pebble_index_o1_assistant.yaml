@@ -1,0 +1,135 @@
+- id: pebble_index_o1_assistant
+  alias: "Pebble Index O1 – Assistant"
+  description: >
+    Receives a voice transcript from the Pebble Index O1 via webhook, hands it
+    to the Home Assistant default conversation agent, and reports the outcome
+    (answer, executed command, or error) as a push notification to the phone
+    running the HA Companion app.
+
+  # Several transcripts can arrive in quick succession (the watch fires one
+  # webhook per recording). `queued` processes them one after another instead
+  # of dropping the later ones, which `single` – the default – would do.
+  mode: queued
+  max: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # TRIGGER
+  # The webhook is reachable at:
+  #   https://<your-ha-url>/api/webhook/<webhook_id>
+  #
+  # Expected request:
+  #   POST, Content-Type: application/json
+  #   {"transcript": "schalte das Licht im Wohnzimmer ein"}
+  #
+  # The webhook ID *is* the credential – anyone who knows the URL can talk
+  # to the assistant. Replace the placeholder below with a long random
+  # string (e.g. `openssl rand -hex 24`) and never commit the real one.
+  #
+  # local_only: false is required because the watch posts from outside the
+  # local network. Set it to true if you only ever call the webhook from
+  # inside your LAN (or through a VPN).
+  # ─────────────────────────────────────────────────────────────────
+  trigger:
+    - platform: webhook
+      webhook_id: pebble-index-o1-assistant-REPLACE-WITH-RANDOM-SECRET
+      allowed_methods:
+        - POST
+      local_only: false
+
+  variables:
+    # ── The two settings you need to adjust ────────────────────────
+    # Your phone's notify service. Find the exact name under
+    # Developer Tools → Actions → search for "notify.mobile_app".
+    notify_service: notify.mobile_app_smartphone
+
+    # `conversation.home_assistant` is the built-in default agent (the one
+    # Settings → Voice assistants shows as "Home Assistant"). Point this at
+    # another agent entity to route the transcript elsewhere.
+    assistant_agent: conversation.home_assistant
+
+    # ── Extract the transcript from the JSON body ──────────────────
+    # `trigger.json` only exists when the request carried a JSON body and a
+    # matching Content-Type header. Defaulting to an empty dict keeps the
+    # template from erroring on form-encoded or empty requests – the guard
+    # below turns that into a proper error notification instead.
+    transcript: "{{ (trigger.json | default({}, true)).get('transcript', '') | string | trim }}"
+
+  action:
+    # ─────────────────────────────────────────────────────────────
+    # GUARD – nothing to process
+    # A missing or empty `transcript` field is reported and ends the run,
+    # so a misconfigured sender is visible on the phone rather than silent.
+    # ─────────────────────────────────────────────────────────────
+    - if:
+        - condition: template
+          value_template: "{{ transcript == '' }}"
+      then:
+        - service: "{{ notify_service }}"
+          data:
+            title: "Assistent – Fehler"
+            message: >
+              Webhook ohne Transkript empfangen. Erwartet wird ein JSON-Body
+              mit dem Feld "transcript".
+            data:
+              tag: pebble-index-o1-assistant-error
+        - stop: "No transcript in webhook payload"
+
+    # ─────────────────────────────────────────────────────────────
+    # ASK THE ASSISTANT
+    #
+    # `continue_on_error` keeps the automation alive when the call itself
+    # fails (agent unavailable, timeout, …). In that case `assistant_result`
+    # is never set, which the next step detects and reports as an error.
+    # ─────────────────────────────────────────────────────────────
+    - service: conversation.process
+      data:
+        text: "{{ transcript }}"
+        agent_id: "{{ assistant_agent }}"
+      response_variable: assistant_result
+      continue_on_error: true
+
+    # ─────────────────────────────────────────────────────────────
+    # INTERPRET THE RESULT
+    #
+    # conversation.process answers with:
+    #   response:
+    #     response_type: action_done | query_answer | error
+    #     speech: {plain: {speech: "…"}}
+    #     data:   {code: "no_intent_match" | …}   (only on errors)
+    #
+    # Everything is read with .get() so an unset `assistant_result` (the
+    # continue_on_error case above) degrades to the error branch instead of
+    # raising a second error inside the error handling.
+    # ─────────────────────────────────────────────────────────────
+    - variables:
+        response: "{{ (assistant_result | default({}, true)).get('response', {}) }}"
+        response_type: "{{ response.get('response_type', 'error') }}"
+        speech: "{{ response.get('speech', {}).get('plain', {}).get('speech', '') | trim }}"
+        error_code: "{{ response.get('data', {}).get('code', 'unknown_error') }}"
+
+    - choose:
+        # ── Success: command executed or question answered ─────────
+        - conditions:
+            - condition: template
+              value_template: "{{ response_type in ['action_done', 'query_answer'] }}"
+          sequence:
+            - service: "{{ notify_service }}"
+              data:
+                title: "Assistent"
+                # Not every intent speaks a reply (some just act), so fall
+                # back to echoing what was understood.
+                message: >
+                  {{ speech if speech else 'Erledigt: ' ~ transcript }}
+                data:
+                  tag: pebble-index-o1-assistant
+
+      # ── Failure: the agent refused, misunderstood, or never answered ──
+      default:
+        - service: "{{ notify_service }}"
+          data:
+            title: "Assistent – Fehler"
+            message: >
+              {{ speech if speech else 'Der Assistent konnte "' ~ transcript ~ '" nicht verarbeiten.' }}
+              ({{ error_code }})
+            data:
+              tag: pebble-index-o1-assistant-error
