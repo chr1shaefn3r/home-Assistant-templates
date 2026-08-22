@@ -6,3 +6,8 @@ dependencies = ["jinja2>=3.0", "pytest>=7.0", "pyyaml>=6.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Nine test modules import shared helpers via `from tests.conftest import _State`,
+# which needs the repository root on sys.path. `python -m pytest` adds the current
+# directory implicitly, but the bare `pytest` command used in CI does not — without
+# this those modules fail to collect with ModuleNotFoundError: No module named 'tests'.
+pythonpath = ["."]
