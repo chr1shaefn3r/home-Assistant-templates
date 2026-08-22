@@ -13,7 +13,7 @@ A collection of Jinja2 templates and YAML automations for [Home Assistant](https
   - [Integration: Morning Summary](#integration-morning-summary-templatesgreeting_day_summaryjinja)
   - [Battery-powered Sensors](#battery-powered-sensors-templatesbattery_sensors)
 - [Automations](#automations)
-  - [PV Smart Outlets](#pv-smart-outlets-automationspv_smart_outletsyaml)
+  - [Solar Priority Manager](#solar-priority-manager-automationssolar_priority_manageryaml)
   - [Pebble Index O1 Assistant](#pebble-index-o1-assistant-automationspebble_index_o1_assistantyaml)
 - [Deploying to Home Assistant](#deploying-to-home-assistant)
   - [Precondition: File Editor app](#precondition-file-editor-app)
@@ -401,44 +401,39 @@ data:
 
 ## Automations
 
-### PV Smart Outlets (`automations/pv_smart_outlets.yaml`)
+### Solar Priority Manager (`automations/solar_priority_manager.yaml`)
 
-Automatically turns smart outlets on when the PV system is producing more power than the house is consuming, and off again when the surplus drops away.
+Distributes surplus solar power across a prioritised list of smart plugs: higher-priority devices are switched on first, and lower-priority ones are shed as soon as the surplus no longer covers them.
 
 **Entities:**
 
 | Entity | Role |
 |---|---|
-| `sensor.pv_grid_return_power` | Watts currently being exported to the grid (positive = exporting) |
-| `switch.smart_outlet_1` | Smart outlet to control (~20 W draw) |
+| `sensor.verteilerkasten_treppe_netz_einspeisung_power` | Watts currently being exported to the grid (positive = exporting) |
+| `switch.tasmota_a793de_keller_ladegerat` | Priority 1 — 18 V charger (~100 W) |
+| `switch.tasmota_a7ef49_keller_ladegerat_12v` | Priority 2 — 12 V charger (~60 W) |
 
 **Logic:**
 
-| Event | Threshold | Action |
-|---|---|---|
-| Surplus rises | above 20 W (outlet draw) | Turn outlet **on** — if it was off |
-| Surplus falls | below 15 W (20 W × 0.75 hysteresis) | Turn outlet **off** — if it was on |
+1. **Reconstruct the true solar output.** The export sensor only shows what currently flows back to the grid; managed devices that are already running consume solar that never appears as export. Their *measured* draw (via each device's optional `power_sensor`, falling back to its rated `watts`) is added back to recover the real budget.
+2. **Walk the priority list top to bottom.** Each device is switched on while the remaining budget covers it, and its watts are deducted. The first device that does not fit is switched off — and so is everything below it, since the budget cannot recover further down the list.
+3. **Apply the plan, off before on.** Shedding first prevents a momentary grid draw before the lower-priority devices are cut.
 
-The 25 % hysteresis gap between the on-threshold (20 W) and off-threshold (15 W) prevents rapid on/off cycling when the sensor oscillates near the boundary.
+**Hysteresis:** a device that is currently off needs 20 % headroom above its rated draw before it is switched on, while a running device only needs its rated draw to stay on. This prevents rapid toggling when the surplus hovers near a threshold — the 100 W charger needs 120 W to start but only 100 W to keep running.
 
-**Home Assistant usage:**
+**Triggers:** the export sensor crossing 50 W in either direction (with a 30 s debounce against brief clouds and spikes), plus a `time_pattern` safety net every 5 minutes in case a trigger is missed.
 
-Copy the file contents into your `config/automations.yaml` (or include it via `automations/` — see [Copying the automations](#copying-the-automations)). Adjust the entity IDs at the top of each automation block to match your setup.
+**Adding or reordering devices:**
 
-**Extending to more outlets:**
-
-Duplicate both automation blocks in `pv_smart_outlets.yaml` and change only these fields in each copy:
+Everything lives in the `devices` list at the top of the action block — the only place you need to touch. Order is priority (first = highest). Each entry takes:
 
 | Field | Description |
 |---|---|
-| `id` | Must be unique across all automations |
-| `alias` | Human-readable name shown in the HA UI |
-| `variables.outlet_entity` | Entity ID of the new outlet switch |
-| `variables.outlet_watts` | Rated power draw of that outlet (W) |
+| `entity` | Entity ID of the switch to control |
+| `watts` | Worst-case draw, used for the turn-on threshold |
+| `power_sensor` | *Optional.* Sensor reporting actual draw, used for budget recovery. Falls back to `watts` when omitted — useful for devices that taper off, such as a battery charger that is nearly full |
 
-Everything else (trigger entity, hysteresis calculation) stays unchanged.
-
-> **HA version note:** Trigger thresholds use automation variables (`above: "{{ outlet_watts }}"`), which requires Home Assistant 2023.4 or newer. For older installations replace the template strings with literal numbers: `above: 20` / `below: 15`.
+The list is written as a Jinja2 expression rather than a YAML list to avoid HA schema validation errors.
 
 ---
 
@@ -536,11 +531,11 @@ For each file:
 HA loads automations from `config/automations.yaml`. The simplest way to add the automations from this repo:
 
 1. Open **File editor** and navigate to `config/automations.yaml` (create it if it does not exist).
-2. Paste the contents of `automations/pv_smart_outlets.yaml` at the end of the file.
-3. Adjust the entity IDs (`switch.smart_outlet_1`, `sensor.pv_grid_return_power`) to match your actual devices.
+2. Paste the contents of the automation you want (`automations/solar_priority_manager.yaml`, `automations/pebble_index_o1_assistant.yaml`) at the end of the file.
+3. Adjust the entity IDs and the settings called out in each automation's section above to match your setup.
 4. Reload automations: **Developer Tools → Actions → `automation.reload`**, or go to **Settings → Automations & Scenes** and click **Reload automations** in the overflow menu.
 
-If you manage automations as individual files (via `automation: !include_dir_merge_list automations/` in `configuration.yaml`), copy `automations/pv_smart_outlets.yaml` directly into your `config/automations/` directory instead.
+If you manage automations as individual files (via `automation: !include_dir_merge_list automations/` in `configuration.yaml`), copy the YAML files directly into your `config/automations/` directory instead.
 
 ---
 
@@ -723,21 +718,7 @@ def test_late_evening_no_reset(render):
 
 When `local_tz` is omitted, `as_local` is a no-op (datetimes are returned unchanged), which matches the default behaviour of HA instances running in UTC.
 
-**Automation tests** (`tests/automations/`) — use `AutomationSimulator` from `tests/automations/simulation.py`, which parses the YAML automation file and simulates the trigger → condition → action pipeline in pure Python (no HA installation required):
-
-```
-automations/pv_smart_outlets.yaml  →  tests/automations/test_pv_smart_outlets.py
-```
-
-```python
-def test_turn_on_when_surplus_crosses_above_threshold(pv_sim):
-    pv_sim.update_state("sensor.pv_grid_return_power", "25")
-    assert pv_sim.service_calls == [
-        ServiceCall("switch.turn_on", ["switch.smart_outlet_1"])
-    ]
-```
-
-The `pv_sim` fixture (in `tests/automations/conftest.py`) provides a fresh simulator pre-loaded with `pv_smart_outlets.yaml` and sensible initial states for each test.
+The automations in `automations/` are not covered by the test suite — they are validated against a running Home Assistant instance.
 
 ### VSCode setup
 
