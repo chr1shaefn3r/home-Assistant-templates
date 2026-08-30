@@ -134,17 +134,37 @@
     #   response:
     #     response_type: action_done | query_answer | error
     #     speech: {plain: {speech: "…"}}
-    #     data:   {code: "no_intent_match" | …}   (only on errors)
+    #     data:   {code: "no_intent_match" | …}      (on errors)
+    #             {targets: [...], success: [...]}   (on action_done)
     #
-    # Everything is read with .get() so an unset `assistant_result` (the
-    # continue_on_error case above) degrades to the error branch instead of
-    # raising a second error inside the error handling.
+    # Each value is pulled straight out of `assistant_result` rather than via
+    # an intermediate `response` variable. A variable can only hold what its
+    # template *rendered*, and HA re-parses that text into a Python value; a
+    # whole response dict does not survive the trip. On a successful action
+    # its `data.targets` entries carry an IntentResponseTargetType enum,
+    # which renders as <IntentResponseTargetType.ENTITY: 'entity'> — not a
+    # Python literal, so the re-parse fails and the variable stays a plain
+    # string. Calling .get() on it then raised
+    # "'str object' has no attribute 'get'", and only on success: the error
+    # responses that were tested first hold nothing but strings, so they
+    # round-tripped cleanly and hid the bug.
+    #
+    # Reading only the leaf values avoids this — each one renders as a
+    # simple string. `assistant_result` itself is the real service response
+    # object, so chaining .get() on it is safe, and defaulting it to an empty
+    # dict keeps the unset case (the continue_on_error above) on the error
+    # branch instead of raising inside the error handling.
     # ─────────────────────────────────────────────────────────────
     - variables:
-        response: "{{ (assistant_result | default({}, true)).get('response', {}) }}"
-        response_type: "{{ response.get('response_type', 'error') }}"
-        speech: "{{ response.get('speech', {}).get('plain', {}).get('speech', '') | trim }}"
-        error_code: "{{ response.get('data', {}).get('code', 'unknown_error') }}"
+        response_type: >
+          {{ (assistant_result | default({}, true)).get('response', {})
+             .get('response_type', 'error') }}
+        speech: >
+          {{ (assistant_result | default({}, true)).get('response', {})
+             .get('speech', {}).get('plain', {}).get('speech', '') | trim }}
+        error_code: >
+          {{ (assistant_result | default({}, true)).get('response', {})
+             .get('data', {}).get('code', 'unknown_error') }}
 
     - choose:
         # ── Success: command executed or question answered ─────────
