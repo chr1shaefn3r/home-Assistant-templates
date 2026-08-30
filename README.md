@@ -492,6 +492,9 @@ Success and error notifications use different `tag` values, so a new answer repl
 | `trigger.webhook_id` | Replace the placeholder with a long random string (`openssl rand -hex 24`). The webhook ID is the only credential protecting the endpoint — anyone who knows the URL can talk to your assistant, so do not commit the real value. |
 | `variables.notify_service` | Your phone's notify service, e.g. `notify.mobile_app_pixel_8`. Look it up under **Developer Tools → Actions**. |
 | `variables.assistant_agent` | `conversation.home_assistant` is the built-in default agent. Point it at another agent entity to route the transcript elsewhere. |
+| `variables.assistant_language` | The language the sentences are matched in, e.g. `de`. Shown under **Settings → Voice assistants → your assistant → Language**. See the note below — this one is not optional. |
+
+**Why `language` must be set explicitly:** `conversation.process` treats `language` as optional, and when it is omitted the request falls back to `hass.config.language` — the language of the Home Assistant installation itself, *not* the language of the Assist pipeline that the UI dialog uses. On an English HA install with a German pipeline, every German sentence then comes back as `no_intent_match` with an English error message ("Sorry, I couldn't understand that"), even though the identical sentence works when typed into the Assist UI. If you see that mismatch — English error, German phrase, works in the UI — this setting is the cause.
 
 `local_only: false` is set because the watch posts from outside the local network. Set it to `true` if the webhook is only ever called from your LAN or through a VPN.
 

@@ -41,7 +41,7 @@
       local_only: false
 
   variables:
-    # ── The two settings you need to adjust ────────────────────────
+    # ── The settings you need to adjust ────────────────────────────
     # Your phone's notify service. Find the exact name under
     # Developer Tools → Actions → search for "notify.mobile_app".
     notify_service: notify.mobile_app_smartphone
@@ -50,6 +50,18 @@
     # Settings → Voice assistants shows as "Home Assistant"). Point this at
     # another agent entity to route the transcript elsewhere.
     assistant_agent: conversation.home_assistant
+
+    # The language the sentences are matched in. This MUST be set: when
+    # `language` is omitted, conversation.process falls back to
+    # `hass.config.language` – the language of the HA installation itself,
+    # NOT the language of the Assist pipeline the UI dialog uses. On an
+    # English HA install with a German pipeline every German sentence then
+    # comes back as `no_intent_match` with an English error message, even
+    # though the exact same sentence works when typed into the Assist UI.
+    #
+    # Set this to the language shown under
+    # Settings → Voice assistants → your assistant → Language.
+    assistant_language: de
 
     # ── Extract the transcript from the request ────────────────────
     # The Index O1 posts multipart/form-data with the text in a field named
@@ -111,6 +123,7 @@
       data:
         text: "{{ transcript }}"
         agent_id: "{{ assistant_agent }}"
+        language: "{{ assistant_language }}"
       response_variable: assistant_result
       continue_on_error: true
 
