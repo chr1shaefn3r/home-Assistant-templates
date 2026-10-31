@@ -315,7 +315,7 @@ To see which entities will be included, paste this into **Developer Tools → Te
    | map(attribute='entity_id') | list }}
 ```
 
-**Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off.
+**Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off, and `weekly_reminder_weekday` (1–7, default `6` = Saturday) to choose the day for weekly reminders (see [Reminder frequency](#reminder-frequency) below).
 
 **Excluding rechargeable devices (phones, tablets, …):**
 
@@ -370,6 +370,19 @@ One-time setup per device:
 
 The template computes `days_remaining = current_level / (capacity_used / days_since_replacement)` and appends `~N Tage` to the alert. Guards: if the helper is missing or unavailable, the replacement was less than a day ago, or the sensor is still at 100%, no estimate is shown.
 
+**Reminder frequency:**
+
+The template is meant to run once a day (e.g. in the morning summary). So it doesn't nag every day, a low battery with a runtime estimate is reported less often while plenty of runtime is left:
+
+| Estimated runtime left | Reported |
+|---|---|
+| 7 days or less | every day |
+| 8–14 days | every other day |
+| more than 14 days | once a week, on `weekly_reminder_weekday` |
+| no estimate (no helper) | every day |
+
+`weekly_reminder_weekday` is an ISO weekday (1 = Monday … 7 = Sunday), default `6` (Saturday). Each device follows its own schedule; the message lists only the devices due today, and is empty if none is due.
+
 **Output examples:**
 
 | Scenario | Output |
@@ -382,6 +395,7 @@ The template computes `days_remaining = current_level / (capacity_used / days_si
 | One sensor low, type + runtime | `Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (ungefähr 8 Tage, CR2032)` |
 | Multiple sensors low | `Folgende Geräte haben niedrigen Akkustand: Bewegungsmelder (8%, AA), Türsensor (12%)` |
 | Low sensor is labelled `rechargeable` | *(excluded — no notification)* |
+| One sensor low, 20 days left, not Saturday | *(empty — not due today)* |
 
 **Home Assistant usage:**
 

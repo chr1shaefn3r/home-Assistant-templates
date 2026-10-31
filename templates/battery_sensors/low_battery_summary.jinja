@@ -1,5 +1,6 @@
 {% set threshold = threshold | default(20) %}
 {% set weekly_reminder_weekday = weekly_reminder_weekday | default(6) %}
+{% set days_per_week = 7 %}
 {% set rechargeable = label_entities('rechargeable') %}
 {% set battery_type_map = {
   'battery_aa':     'AA',
@@ -24,10 +25,7 @@
 {% set ns = namespace(low=[]) %}
 {% for s in battery_sensors %}
 {% if s.state not in ['unavailable', 'unknown'] and s.state | int(-1) <= threshold %}
-{% set ns2 = namespace(type='') %}
-{% for label, display in battery_type_map.items() %}
-{% if s.entity_id in label_entities(label) %}{% set ns2.type = display %}{% endif %}
-{% endfor %}
+{# Runtime estimate from the input_datetime.<sensor>_replaced helper #}
 {% set ns3 = namespace(estimate='', due=true) %}
 {% set helper_id = 'input_datetime.' ~ s.entity_id.split('.')[1] ~ '_replaced' %}
 {% set replaced_state = states(helper_id) %}
@@ -37,16 +35,21 @@
 {% if days_since > 1 and capacity_used > 0 %}
 {% set days_remaining = (s.state | int(0) / (capacity_used / days_since)) | round(0) | int %}
 {% set ns3.estimate = 'ungefähr ' ~ days_remaining ~ ' Tage' %}
-{% if days_remaining > 14 %}{% set ns3.due = now().isoweekday() == weekly_reminder_weekday %}
-{% elif days_remaining > 7 %}{% set ns3.due = now().date().toordinal() % 2 == 0 %}
+{# Reminder schedule: daily in the last week, every other day the week before, weekly before that #}
+{% if days_remaining > 2 * days_per_week %}{% set ns3.due = now().isoweekday() == weekly_reminder_weekday %}
+{% elif days_remaining > days_per_week %}{% set ns3.due = now().date().toordinal() % 2 == 0 %}
 {% endif %}
 {% endif %}
 {% endif %}
-{% set ns4 = namespace(parts=[]) %}
-{% if ns3.estimate %}{% set ns4.parts = ns4.parts + [ns3.estimate] %}{% endif %}
-{% if not ns3.estimate %}{% set ns4.parts = ns4.parts + [s.state ~ '%'] %}{% endif %}
+{% if ns3.due %}
+{% set ns2 = namespace(type='') %}
+{% for label, display in battery_type_map.items() %}
+{% if s.entity_id in label_entities(label) %}{% set ns2.type = display %}{% endif %}
+{% endfor %}
+{% set ns4 = namespace(parts=[ns3.estimate if ns3.estimate else s.state ~ '%']) %}
 {% if ns2.type %}{% set ns4.parts = ns4.parts + [ns2.type] %}{% endif %}
-{% if ns3.due %}{% set ns.low = ns.low + [s.name ~ ' (' ~ ns4.parts | join(', ') ~ ')'] %}{% endif %}
+{% set ns.low = ns.low + [s.name ~ ' (' ~ ns4.parts | join(', ') ~ ')'] %}
+{% endif %}
 {% endif %}
 {% endfor %}
 {% if ns.low | length == 1 %}Folgendes Gerät hat einen niedrigen Akkustand: {{ ns.low | join(', ') }}
