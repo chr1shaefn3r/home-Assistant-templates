@@ -19,5 +19,6 @@
 {% endif %}
 {% endif %}
 {% endfor %}
-{% if ns.found %}Ab {{ ns.cool_hour }} Uhr bleibt es unter {{ temperature_threshold }} Grad.
+{% set daily_max_below_threshold = daily_max_temperature is defined and daily_max_temperature < temperature_threshold %}
+{% if ns.found and not daily_max_below_threshold %}Ab {{ ns.cool_hour }} Uhr bleibt es unter {{ temperature_threshold }} Grad.
 {% endif %}
