@@ -7,6 +7,9 @@ Happy-path scenario: every included template produces visible output.
   - evening_cooling      → hour when temperature stays below threshold
   - daily_family_summary → upcoming calendar event
   - low_battery_summary  → low-battery sensor alert
+
+Cold-day scenario: the daily max stays below the evening cooling threshold,
+so evening_cooling renders nothing. Both weather lines use the same daily max.
 """
 from datetime import datetime
 
@@ -18,7 +21,7 @@ DAILY_FORECAST = [
     {
         "condition": "cloudy",
         "datetime": "2026-03-27T11:00:00+00:00",
-        "temperature": 8.8,
+        "temperature": 23.5,
     }
 ]
 
@@ -50,7 +53,7 @@ MOTION = _State(
 
 EXPECTED = (
     "Guten Morgen, es ist 5Uhr 55.\n"
-    "Das Wetter ist aktuell bewölkt und es wird höchstens 8.8 Grad warm.\n"
+    "Das Wetter ist aktuell bewölkt und es wird höchstens 23.5 Grad warm.\n"
     "Heute regnet es von 9 bis 11 Uhr\n"
     "Ab 19 Uhr bleibt es unter 21 Grad.\n"
     "Folgende Familientermine sind für heute noch geplant:\n"
@@ -72,3 +75,46 @@ def test_greeting_day_summary(render):
         labels={"battery_aa": ["sensor.motion_battery"]},
     )
     assert result == EXPECTED
+
+
+COLD_DAILY_FORECAST = [
+    {
+        "condition": "cloudy",
+        "datetime": "2026-03-27T11:00:00+00:00",
+        "temperature": 8.8,
+    }
+]
+
+# Cold all day: the evening is below 21 °C from the start, which on its own
+# would render "Ab 18 Uhr bleibt es unter 21 Grad."
+COLD_HOURLY_FORECAST = [
+    {"condition": "rainy",       "datetime": "2026-03-27T09:00:00+00:00", "precipitation": 1.5, "temperature": 5.0},
+    {"condition": "rainy",       "datetime": "2026-03-27T10:00:00+00:00", "precipitation": 1.2, "temperature": 6.0},
+    {"condition": "cloudy",      "datetime": "2026-03-27T14:00:00+00:00", "precipitation": 0,   "temperature": 8.8},
+    {"condition": "cloudy",      "datetime": "2026-03-27T18:00:00+00:00", "precipitation": 0,   "temperature": 7.0},
+    {"condition": "clear-night", "datetime": "2026-03-27T19:00:00+00:00", "precipitation": 0,   "temperature": 6.0},
+]
+
+EXPECTED_COLD_DAY = (
+    "Guten Morgen, es ist 5Uhr 55.\n"
+    "Das Wetter ist aktuell bewölkt und es wird höchstens 8.8 Grad warm.\n"
+    "Heute regnet es von 9 bis 11 Uhr\n"
+    "Folgende Familientermine sind für heute noch geplant:\n"
+    "Kinderarzt von 10 Uhr 30 bis 11 Uhr\n"
+    "Folgendes Gerät hat einen niedrigen Akkustand: Bewegungsmelder (8%, AA)"
+)
+
+
+def test_greeting_day_summary_cold_day_skips_evening_cooling(render):
+    result = render(
+        TEMPLATE,
+        now=datetime(2026, 3, 27, 5, 55, 0),
+        variables={
+            "daily_forecast": COLD_DAILY_FORECAST,
+            "hourly_forecast": COLD_HOURLY_FORECAST,
+            "events": EVENTS_ONE_TIMED,
+        },
+        state_objects=[MOTION],
+        labels={"battery_aa": ["sensor.motion_battery"]},
+    )
+    assert result == EXPECTED_COLD_DAY

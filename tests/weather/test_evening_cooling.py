@@ -2,7 +2,8 @@
 
 Finds the first hour of the final consecutive cool run in the evening
 (i.e. 'when does it stay below the threshold').
-Renders nothing if the temperature never drops below the threshold.
+Renders nothing if the temperature never drops below the threshold, or if
+the day's maximum temperature (`daily_max_temperature`) is already below it.
 """
 from datetime import datetime
 
@@ -118,3 +119,44 @@ def test_tomorrow_forecast_ignored(render):
         variables={"forecast": forecast},
     )
     assert result == ""
+
+
+FORECAST_COOL_ALL_EVENING = [
+    {"datetime": "2026-03-27T18:00:00+00:00", "temperature": 20.5},
+    {"datetime": "2026-03-27T19:00:00+00:00", "temperature": 19.0},
+    {"datetime": "2026-03-27T20:00:00+00:00", "temperature": 18.0},
+]
+
+
+def test_daily_max_below_threshold_renders_nothing(render):
+    """The whole day stays below the threshold — evening cooling is irrelevant."""
+    result = render(
+        TEMPLATE,
+        now=datetime(2026, 3, 27, 8, 0, 0),
+        variables={"forecast": FORECAST_COOL_ALL_EVENING, "daily_max_temperature": 20.9},
+    )
+    assert result == ""
+
+
+def test_daily_max_at_threshold_still_renders(render):
+    """Boundary: a daily max exactly at the threshold is not *below* it."""
+    result = render(
+        TEMPLATE,
+        now=datetime(2026, 3, 27, 8, 0, 0),
+        variables={"forecast": FORECAST_COOL_ALL_EVENING, "daily_max_temperature": 21},
+    )
+    assert result == "Ab 18 Uhr bleibt es unter 21 Grad."
+
+
+def test_daily_max_compared_against_custom_threshold(render):
+    """The daily max is compared against the configured threshold, not the default."""
+    result = render(
+        TEMPLATE,
+        now=datetime(2026, 3, 27, 8, 0, 0),
+        variables={
+            "forecast": FORECAST_COOLS_AT_20,
+            "temperature_threshold": 19,
+            "daily_max_temperature": 20.0,
+        },
+    )
+    assert result == "Ab 22 Uhr bleibt es unter 19 Grad."
