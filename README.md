@@ -315,7 +315,7 @@ To see which entities will be included, paste this into **Developer Tools → Te
    | map(attribute='entity_id') | list }}
 ```
 
-**Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off, and `weekly_reminder_weekday` (1–7, default `6` = Saturday) to choose the day for weekly reminders (see [Reminder frequency](#reminder-frequency) below).
+**Input:** no variables required. Optionally pass `threshold` (integer, default `20`) to change the low-battery cut-off, and `weekly_reminder_weekday` (1–7, default `6` = Saturday) to choose the day for weekly reminders (see **Reminder frequency** below).
 
 **Excluding rechargeable devices (phones, tablets, …):**
 
