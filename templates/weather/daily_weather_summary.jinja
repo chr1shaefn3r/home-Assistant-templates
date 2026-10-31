@@ -16,4 +16,5 @@
   'windy-variant':   'windig'
 } %}
 {% set today = forecast[0] %}
-Das Wetter ist aktuell {{ conditions.get(today.condition, today.condition) }} und es wird höchstens {{ today.temperature }} Grad warm.
+{% set daily_max_temperature = daily_max_temperature | default(today.temperature) %}
+Das Wetter ist aktuell {{ conditions.get(today.condition, today.condition) }} und es wird höchstens {{ daily_max_temperature }} Grad warm.

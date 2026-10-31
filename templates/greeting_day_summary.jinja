@@ -1,5 +1,6 @@
 {% include 'greeting/greeting.jinja' %}
 {% set forecast = daily_forecast %}
+{# Single source for the daily max: shared by the weather summary and evening cooling #}
 {% set daily_max_temperature = daily_forecast[0].temperature %}
 {% include 'weather/daily_weather_summary.jinja' %}
 {% set forecast = hourly_forecast %}

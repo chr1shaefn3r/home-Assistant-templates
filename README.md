@@ -77,6 +77,8 @@ data:
 
 Input: the `forecast` list from a `weather.get_forecasts` action call (daily resolution). Uses `forecast[0]` (today's entry).
 
+Optional variable `daily_max_temperature`: overrides the high temperature taken from `forecast[0].temperature`. The morning summary sets it so the weather line and `evening_cooling.jinja` use the same value.
+
 **Output examples:**
 
 | Scenario | Output |
@@ -156,7 +158,7 @@ data:
 
 **`evening_cooling.jinja`**
 
-Reports from which hour the outside temperature will stay below a configurable threshold in the evening. Useful for deciding when to open windows to cool a room. Renders nothing if the temperature never drops below the threshold that evening.
+Reports from which hour the outside temperature will stay below a configurable threshold in the evening. Useful for deciding when to open windows to cool a room. Renders nothing if the temperature never drops below the threshold that evening, or if the day's maximum temperature (`daily_max_temperature`, when given) is already below the threshold — then there is nothing to cool down.
 
 **Input:** the `forecast` list from a `weather.get_forecasts` action call (hourly resolution).
 
@@ -166,6 +168,7 @@ Reports from which hour the outside temperature will stay below a configurable t
 |---|---|---|
 | `temperature_threshold` | `21` | Temperature in °C below which the evening is considered cool enough |
 | `evening_start` | `18` | First hour of the evening window (24 h) |
+| `daily_max_temperature` | *(unset)* | Today's maximum temperature in °C. If below `temperature_threshold`, the template renders nothing. Unset → this check is skipped |
 
 **Output examples:**
 
@@ -174,6 +177,7 @@ Reports from which hour the outside temperature will stay below a configurable t
 | Temperature drops below 21 °C at 20:00 | `Ab 20 Uhr bleibt es unter 21 Grad.` |
 | Temperature dips below then rises, finally cool at 22:00 | `Ab 22 Uhr bleibt es unter 21 Grad.` |
 | Temperature never drops below threshold | *(empty — no output)* |
+| Daily max below threshold | *(empty — no output)* |
 
 **Timezone handling:** forecast `datetime` values are piped through HA's `as_local` filter before the date and hour are extracted. This means all comparisons happen in your configured local timezone, not UTC. Without this, UTC forecast entries late in the evening (e.g. 22:00–23:00 UTC in a UTC+2 timezone) would be treated as "today" even though they represent midnight or 01:00 the next local day — and if those entries happened to be warm, they would incorrectly clear the result and produce empty output.
 
@@ -246,6 +250,8 @@ data:
 ### Integration: Morning Summary (`templates/greeting_day_summary.jinja`)
 
 Composes all four groups into a single morning briefing: greeting → weather → rain → family calendar.
+
+It sets `daily_max_temperature` once from the daily forecast (`daily_forecast[0].temperature`). Both `daily_weather_summary.jinja` and `evening_cooling.jinja` read this value, so the evening cooling line is skipped on days that never get warmer than its threshold.
 
 **Output example:**
 
